@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Film Critic
 
-## Getting Started
+Rate movies and series on five criteria (plot, ending, acting, atmosphere, vibe). Posters, descriptions, trailers and cast come from TMDB. Ratings sync live across devices, and you can import or export CSV/Excel.
 
-First, run the development server:
+Stack: Next.js 16 · Supabase (Postgres, auth, realtime) · TMDB API · optional OMDb for IMDb ratings. Every service has a free tier that covers this.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Setup
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Supabase**: create a project at [supabase.com](https://supabase.com), then open SQL Editor and run [`supabase/schema.sql`](supabase/schema.sql).
+   To sign in without confirming your email: Authentication → Sign In / Providers → Email → turn off "Confirm email".
+2. **TMDB**: create an account at [themoviedb.org](https://www.themoviedb.org), then go to Settings → API and request a key (choose "Developer", personal use).
+3. **OMDb** (optional, adds IMDb ratings): get a free key at [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx).
+4. Copy the env file and fill it in:
+   ```bash
+   cp .env.example .env.local
+   ```
+5. Start it:
+   ```bash
+   npm install
+   npm run dev
+   ```
+   Open http://localhost:3000, create an account, and use **Import** to load your spreadsheet. From Google Sheets, export it with File → Download → CSV.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy (Vercel)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Push to GitHub, import the repo on [vercel.com](https://vercel.com), and add the same env vars from `.env.local`.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Supabase pauses free projects after 7 days without activity. Resume one from the dashboard; your data stays.
