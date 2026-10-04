@@ -171,7 +171,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const inserts = rows.filter((r) => !r.id);
       const updates = rows.filter((r): r is TitleInput & { id: string } => !!r.id);
       if (inserts.length) {
-        const { error } = await db().from("titles").insert(inserts);
+        // Rows carry `id: undefined`; without defaultToNull: false a bulk insert sends it
+        // as NULL instead of falling back to the column default.
+        const { error } = await db().from("titles").insert(inserts, { defaultToNull: false });
         if (error) throw error;
       }
       for (const { id, ...patch } of updates) {
