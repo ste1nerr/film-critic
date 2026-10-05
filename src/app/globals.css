@@ -30,6 +30,8 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
+  /* Safety net against stray horizontal page scroll; `clip` (unlike `hidden`) keeps the sticky header working. */
+  overflow-x: clip;
 }
 
 ::selection {

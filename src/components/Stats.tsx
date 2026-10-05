@@ -45,7 +45,7 @@ export function Stats() {
   const strictest = data.criteria.reduce((a, b) => (b.value < a.value ? b : a));
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6 px-4 py-6 sm:py-8">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Tile label="Titles rated" value={String(titles.length)} />
         <Tile label="Average score" value={formatScore(avg(titles.map((t) => t.overall)))} />
@@ -53,7 +53,7 @@ export function Stats() {
         <Tile label="Strictest on" value={strictest.label} />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card title="Average by criterion">
           <Bars items={data.criteria} max={5} format={(v) => v.toFixed(1)} />
         </Card>
@@ -62,7 +62,7 @@ export function Stats() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card title="Average by genre">
           {data.genres.length ? (
             <Bars items={data.genres} max={5} format={(v) => v.toFixed(1)} />
@@ -75,9 +75,9 @@ export function Stats() {
             {data.top.map((t, i) => (
               <li key={t.id}>
                 <Link href={`/title/${t.id}`} className="flex items-center gap-3 rounded-lg p-1 hover:bg-surface-2">
-                  <span className="w-5 text-right font-display text-xl text-muted">{i + 1}</span>
+                  <span className="w-6 shrink-0 text-right font-display text-xl text-muted">{i + 1}</span>
                   <Poster path={t.poster_path} alt="" size="w92" className="h-10 w-7 shrink-0 rounded text-[0px]" />
-                  <span className="flex-1 truncate text-sm">{t.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{t.name}</span>
                   <ScoreBadge value={t.overall} size="sm" />
                 </Link>
               </li>
@@ -86,7 +86,7 @@ export function Stats() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card title="You liked more than the crowd">
           <GapList items={data.loved} />
         </Card>
@@ -103,8 +103,8 @@ export function Stats() {
 
 function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="font-display text-4xl leading-none tracking-wide">{value}</div>
+    <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 sm:p-4">
+      <div className="font-display text-3xl leading-none tracking-wide [overflow-wrap:anywhere] sm:text-4xl">{value}</div>
       <div className="mt-1 text-xs uppercase tracking-wider text-muted">{label}</div>
     </div>
   );
@@ -112,7 +112,7 @@ function Tile({ label, value }: { label: string; value: string }) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
+    <section className="min-w-0 rounded-2xl border border-border bg-surface p-4 sm:p-5">
       <h2 className="mb-4 font-display text-2xl tracking-wide text-muted">{title}</h2>
       {children}
     </section>
@@ -125,14 +125,14 @@ function Bars({ items, max, format }: { items: { label: string; value: number }[
     <div className="space-y-2.5">
       {items.map((it) => (
         <div key={it.label} className="group flex items-center gap-3 text-sm" title={`${it.label}: ${format(it.value)}`}>
-          <span className="w-32 shrink-0 truncate text-muted group-hover:text-foreground">{it.label}</span>
+          <span className="w-24 shrink-0 truncate text-muted sm:w-32 group-hover:text-foreground">{it.label}</span>
           <div className="h-2.5 flex-1 rounded-full bg-surface-2">
             <div
               className="h-full rounded-full bg-accent transition-all group-hover:brightness-125"
               style={{ width: `${(it.value / max) * 100}%` }}
             />
           </div>
-          <span className="w-8 text-right tabular-nums">{format(it.value)}</span>
+          <span className="w-8 shrink-0 text-right tabular-nums">{format(it.value)}</span>
         </div>
       ))}
     </div>
@@ -143,7 +143,7 @@ function Bars({ items, max, format }: { items: { label: string; value: number }[
 function Histogram({ items }: { items: { label: string; value: number }[] }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
-    <div className="flex h-48 items-end gap-3 border-b border-border">
+    <div className="flex h-48 items-end gap-2 border-b border-border sm:gap-3">
       {items.map((it) => (
         <div key={it.label} className="group flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${it.label}: ${it.value} titles`}>
           <span className="text-xs tabular-nums text-muted group-hover:text-foreground">{it.value || ""}</span>
@@ -151,7 +151,7 @@ function Histogram({ items }: { items: { label: string; value: number }[] }) {
             className="w-full max-w-14 rounded-t bg-accent transition-all group-hover:brightness-125"
             style={{ height: `${(it.value / max) * 85}%` }}
           />
-          <span className="pb-1 pt-1 text-[11px] text-muted">{it.label}</span>
+          <span className="whitespace-nowrap pb-1 pt-1 text-[11px] text-muted">{it.label}</span>
         </div>
       ))}
     </div>
@@ -166,11 +166,11 @@ function GapList({ items }: { items: { t: Title; gap: number }[] }) {
         <li key={t.id}>
           <Link href={`/title/${t.id}`} className="flex items-center gap-3 rounded-lg p-1 text-sm hover:bg-surface-2">
             <Poster path={t.poster_path} alt="" size="w92" className="h-10 w-7 shrink-0 rounded text-[0px]" />
-            <span className="flex-1 truncate">{t.name}</span>
-            <span className="tabular-nums text-muted">
+            <span className="min-w-0 flex-1 truncate">{t.name}</span>
+            <span className="hidden shrink-0 tabular-nums text-muted min-[400px]:inline">
               {(t.overall * 2).toFixed(1)} vs {(t.imdb_rating ?? t.tmdb_rating)?.toFixed(1)}
             </span>
-            <span className={`w-12 text-right font-semibold tabular-nums ${gap > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            <span className={`w-12 shrink-0 text-right font-semibold tabular-nums ${gap > 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {gap > 0 ? "+" : ""}
               {gap.toFixed(1)}
             </span>

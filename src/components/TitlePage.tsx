@@ -86,58 +86,64 @@ function TitleView({ title: t }: { title: Title }) {
   ].filter(Boolean);
 
   return (
-    <div className="flex-1">
+    <div className="min-w-0 flex-1">
       {/* Backdrop hero */}
-      <div className="relative">
+      <div className="relative overflow-hidden">
         {backdrop && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={backdrop} alt="" className="absolute inset-0 size-full object-cover object-top opacity-35" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/20" />
-        <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-8 pt-10 sm:flex-row sm:items-end sm:pt-24">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-8 pt-8 sm:flex-row sm:items-end sm:pt-24">
           <Poster
             path={t.poster_path}
             alt={t.name}
             size="w500"
-            className="aspect-[2/3] w-40 shrink-0 rounded-2xl border border-border shadow-2xl shadow-black/60 sm:w-56"
+            className="aspect-[2/3] w-36 shrink-0 rounded-2xl border border-border shadow-2xl shadow-black/60 sm:w-44 lg:w-56"
           />
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-5xl leading-none tracking-wide sm:text-7xl">{t.name}</h1>
-            {details?.tagline && <p className="mt-2 italic text-muted">“{details.tagline}”</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-              {meta.map((m, i) => (
-                <span key={i}>{m}</span>
-              ))}
-            </div>
-            {t.genres.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {t.genres.map((g) => (
-                  <span key={g} className="rounded-full border border-border bg-surface/70 px-2.5 py-0.5 text-xs">
-                    {g}
-                  </span>
+          {/* Scores sit under the info until there's room for a third column. */}
+          <div className="flex min-w-0 flex-1 flex-col gap-6 lg:flex-row lg:items-end">
+            <div className="min-w-0 flex-1">
+              <h1 className="break-words font-display text-5xl leading-none tracking-wide sm:text-6xl lg:text-7xl">{t.name}</h1>
+              {details?.tagline && <p className="mt-2 italic text-muted">“{details.tagline}”</p>}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                {meta.map((m, i) => (
+                  <span key={i}>{m}</span>
                 ))}
               </div>
-            )}
-            {details && details.creators.length > 0 && (
-              <p className="mt-3 text-sm text-muted">
-                {t.media_type === "tv" ? "Created by" : "Directed by"}{" "}
-                <span className="text-foreground">{details.creators.join(", ")}</span>
-              </p>
-            )}
-          </div>
-          <div className="flex items-end gap-4">
-            <CrowdScore label="IMDb" value={t.imdb_rating} />
-            <CrowdScore label="TMDB" value={t.tmdb_rating} />
-            <div className="text-center">
-              <ScoreBadge value={t.overall} size="lg" />
-              <div className="mt-1 text-xs uppercase tracking-wider text-muted">You</div>
+              {t.genres.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {t.genres.map((g) => (
+                    <span key={g} className="rounded-full border border-border bg-surface/70 px-2.5 py-0.5 text-xs">
+                      {g}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {details && details.creators.length > 0 && (
+                <p className="mt-3 text-sm text-muted">
+                  {t.media_type === "tv" ? "Created by" : "Directed by"}{" "}
+                  <span className="text-foreground">{details.creators.join(", ")}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-start gap-5">
+              <CrowdScore label="IMDb" value={t.imdb_rating} />
+              <CrowdScore label="TMDB" value={t.tmdb_rating} />
+              <div className="flex flex-col items-center">
+                <div className="flex h-16 items-center">
+                  <ScoreBadge value={t.overall} size="lg" />
+                </div>
+                <div className="mt-1 text-xs uppercase tracking-wider text-muted">You</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 pb-12 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
+      {/* minmax(0,…) keeps the wide cast strip from stretching the column and the page. */}
+      <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-6 px-4 pb-12 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-6">
           {t.overview && (
             <Section title="Overview">
               <p className="leading-relaxed text-foreground/90">{t.overview}</p>
@@ -159,9 +165,9 @@ function TitleView({ title: t }: { title: Title }) {
 
           {details && details.cast.length > 0 && (
             <Section title="Cast">
-              <div className="scrollbar-none -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+              <div className="scrollbar-none -mx-1 flex snap-x gap-3 overflow-x-auto overscroll-x-contain px-1 pb-1">
                 {details.cast.map((c) => (
-                  <div key={c.name + c.character} className="w-24 shrink-0">
+                  <div key={c.name + c.character} className="w-24 shrink-0 snap-start">
                     <Poster path={c.profile_path} alt={c.name} size="w185" className="aspect-[2/3] w-full rounded-lg text-[10px]" />
                     <div className="mt-1.5 truncate text-xs font-medium">{c.name}</div>
                     {c.character && <div className="truncate text-[11px] text-muted">{c.character}</div>}
@@ -182,7 +188,7 @@ function TitleView({ title: t }: { title: Title }) {
           {detailsError && <p className="text-sm text-rose-300">Couldn’t load details: {detailsError}</p>}
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <Section title="Your ratings">
             <div className="rounded-2xl border border-border bg-surface p-4">
               <div className="flex justify-center">
@@ -262,8 +268,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function CrowdScore({ label, value }: { label: string; value: number | null }) {
   if (value == null) return null;
   return (
-    <div className="text-center">
-      <div className="font-display text-4xl leading-none tabular-nums">{value.toFixed(1)}</div>
+    <div className="flex flex-col items-center">
+      {/* Same height as the lg ScoreBadge so values and labels line up across columns. */}
+      <div className="flex h-16 items-center font-display text-4xl leading-none tabular-nums">{value.toFixed(1)}</div>
       <div className="mt-1 text-xs uppercase tracking-wider text-muted">{label} /10</div>
     </div>
   );

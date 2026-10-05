@@ -6,7 +6,7 @@ import { Button } from "./ui";
 
 function Hero({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-16">
+    <div className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-10 sm:py-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,179,1,0.15),transparent_60%)]" />
       <div className="relative w-full max-w-md">{children}</div>
     </div>
@@ -40,14 +40,14 @@ export function AuthScreen() {
 
   return (
     <Hero>
-      <h1 className="font-display text-6xl leading-none tracking-wide">
+      <h1 className="font-display text-5xl leading-none tracking-wide sm:text-6xl">
         Your taste,
         <br />
         <span className="text-accent">scored.</span>
       </h1>
       <p className="mt-3 text-muted">Rate every movie and series on plot, ending, acting, atmosphere and vibe.</p>
 
-      <form onSubmit={submit} className="mt-8 space-y-3 rounded-2xl border border-border bg-surface p-5">
+      <form onSubmit={submit} className="mt-8 space-y-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
         <input
           type="email"
           required
@@ -88,9 +88,9 @@ export function AuthScreen() {
 export function SetupScreen() {
   return (
     <Hero>
-      <h1 className="font-display text-5xl tracking-wide">Almost there</h1>
+      <h1 className="font-display text-4xl tracking-wide sm:text-5xl">Almost there</h1>
       <p className="mt-2 text-muted">Connect a free Supabase project to store your ratings.</p>
-      <ol className="mt-6 list-decimal space-y-2 pl-5 text-sm text-muted">
+      <ol className="mt-6 list-decimal space-y-2 pl-5 text-sm text-muted [overflow-wrap:anywhere]">
         <li>
           Create a project at <span className="text-foreground">supabase.com</span>.
         </li>

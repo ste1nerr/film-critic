@@ -64,7 +64,7 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
           onPick={(result) => setPick({ kind: "tmdb", result })}
           footer={(q) =>
             q && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 text-sm text-muted">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-sm text-muted [overflow-wrap:anywhere]">
                 Not on TMDB? Add “{q}” as
                 <button className="text-accent hover:underline" onClick={() => setPick({ kind: "manual", name: q, media_type: "movie" })}>
                   movie
@@ -79,15 +79,15 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
         />
       ) : (
         <div className="space-y-5">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <Poster
               path={pick.kind === "tmdb" ? pick.result.poster_path : null}
               alt={name ?? ""}
               size="w185"
-              className="h-28 w-[75px] shrink-0 rounded-lg text-xs"
+              className="h-24 w-16 shrink-0 rounded-lg text-xs sm:h-28 sm:w-[75px]"
             />
             <div className="min-w-0 flex-1">
-              <div className="text-lg font-semibold leading-tight">{name}</div>
+              <div className="break-words text-lg font-semibold leading-tight">{name}</div>
               {pick.kind === "tmdb" && (
                 <div className="text-sm text-muted">
                   {pick.result.year ?? "—"} · {pick.result.media_type === "tv" ? "Series" : "Movie"}
@@ -97,7 +97,12 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
                 Change
               </button>
             </div>
-            <ScoreBadge value={overallOf(ratings)} size="lg" />
+            <div className="shrink-0 sm:hidden">
+              <ScoreBadge value={overallOf(ratings)} />
+            </div>
+            <div className="hidden shrink-0 sm:block">
+              <ScoreBadge value={overallOf(ratings)} size="lg" />
+            </div>
           </div>
 
           {duplicate && (

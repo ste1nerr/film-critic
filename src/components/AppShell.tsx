@@ -13,9 +13,9 @@ import { Button, Spinner } from "./ui";
 
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2">
+    <Link href="/" className="flex shrink-0 items-center gap-2">
       <span className="grid size-8 place-items-center rounded-lg bg-accent text-black">🎬</span>
-      <span className="font-display text-2xl tracking-wider">Film Critic</span>
+      <span className="whitespace-nowrap font-display text-2xl tracking-wider">Film Critic</span>
     </Link>
   );
 }
@@ -32,14 +32,24 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
-function ExportMenu() {
+function ExportMenu({ compact = false }: { compact?: boolean }) {
   const { titles } = useStore();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <Button onClick={() => setOpen((o) => !o)} disabled={!titles.length}>
-        Export
-      </Button>
+      {compact ? (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          disabled={!titles.length}
+          className="rounded-lg px-3 py-1.5 text-sm text-muted hover:text-foreground disabled:opacity-50"
+        >
+          Export
+        </button>
+      ) : (
+        <Button onClick={() => setOpen((o) => !o)} disabled={!titles.length}>
+          Export
+        </Button>
+      )}
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
@@ -85,19 +95,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-3">
           <Logo />
           {user && (
             <>
-              <nav className="ml-4 hidden gap-1 sm:flex">
+              <nav className="ml-2 hidden gap-1 sm:flex lg:ml-4">
                 <NavLink href="/">Library</NavLink>
                 <NavLink href="/stats">Stats</NavLink>
               </nav>
               <div className="ml-auto flex items-center gap-2">
-                <Button onClick={() => setImporting(true)} className="hidden md:inline-flex">
+                <Button onClick={() => setImporting(true)} className="hidden sm:inline-flex">
                   Import
                 </Button>
-                <div className="hidden md:block">
+                <div className="hidden sm:block">
                   <ExportMenu />
                 </div>
                 <Button variant="primary" onClick={() => setAdding(true)}>
@@ -106,7 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   onClick={signOut}
                   title={`Sign out ${user.email ?? ""}`}
-                  className="grid size-9 place-items-center rounded-full bg-surface-2 text-sm font-semibold uppercase text-muted hover:text-foreground"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-sm font-semibold uppercase text-muted hover:text-foreground"
                 >
                   {user.email?.[0] ?? "?"}
                 </button>
@@ -115,13 +125,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
         {user && (
-          <nav className="flex gap-1 border-t border-border/60 px-4 py-1.5 sm:hidden">
+          <nav className="flex items-center gap-1 border-t border-border/60 px-4 py-1.5 sm:hidden">
             <NavLink href="/">Library</NavLink>
             <NavLink href="/stats">Stats</NavLink>
-            <button onClick={() => setImporting(true)} className="ml-auto px-3 py-1.5 text-sm text-muted">
+            <button
+              onClick={() => setImporting(true)}
+              className="ml-auto rounded-lg px-3 py-1.5 text-sm text-muted hover:text-foreground"
+            >
               Import
             </button>
-            <ExportMenu />
+            <ExportMenu compact />
           </nav>
         )}
       </header>

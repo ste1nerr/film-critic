@@ -13,7 +13,7 @@ export function RatingEditor({
   return (
     <div className="space-y-3">
       {CRITERIA.map((c) => (
-        <div key={c.key} className="flex items-center justify-between gap-4">
+        <div key={c.key} className="flex flex-col gap-1.5 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between min-[400px]:gap-4">
           <div className="min-w-0">
             <div className="text-sm font-medium">{c.label}</div>
             {"hint" in c && <div className="truncate text-xs text-muted">{c.hint}</div>}
@@ -28,7 +28,7 @@ export function RatingEditor({
                   role="radio"
                   aria-checked={active}
                   onClick={() => onChange(c.key, n)}
-                  className={`size-9 rounded-lg text-sm font-semibold tabular-nums transition ${
+                  className={`h-9 flex-1 rounded-lg min-[400px]:w-9 min-[400px]:flex-none text-sm font-semibold tabular-nums transition ${
                     active ? `${scoreTone(n)} scale-105` : "bg-surface-2 text-muted hover:text-foreground hover:bg-border"
                   }`}
                 >

@@ -89,17 +89,17 @@ export function Library() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6">
+    <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-6">
       <Hero titles={titles} />
 
       {error && <p className="mb-4 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-stretch gap-2">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by name…"
-          className="min-w-0 flex-1 basis-48 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent"
+          className="min-w-0 flex-1 basis-full rounded-lg sm:basis-48 border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent"
         />
         <Segmented<TypeFilter>
           value={type}
@@ -113,7 +113,7 @@ export function Library() {
         <select
           value={genre}
           onChange={(e) => setGenre(e.target.value)}
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
         >
           <option value="">All genres</option>
           {genres.map((g) => (
@@ -123,7 +123,7 @@ export function Library() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
         >
           {SORTS.map((s) => (
             <option key={s.value} value={s.value}>
@@ -168,12 +168,12 @@ function Segmented<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="flex rounded-lg border border-border bg-surface p-0.5">
+    <div className="flex flex-1 rounded-lg border border-border bg-surface p-0.5 sm:flex-none">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-md px-3 py-1.5 text-sm transition ${value === o.value ? "bg-surface-2 text-foreground" : "text-muted hover:text-foreground"}`}
+          className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition ${value === o.value ? "bg-surface-2 text-foreground" : "text-muted hover:text-foreground"}`}
         >
           {o.label}
         </button>
@@ -200,15 +200,15 @@ function Hero({ titles }: { titles: Title[] }) {
         <img src={backdrop} alt="" className="absolute inset-0 size-full object-cover opacity-40 transition duration-700 group-hover:scale-105" />
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
-      <div className="relative flex flex-wrap items-end justify-between gap-6 p-6 sm:p-8">
-        <div>
+      <div className="relative flex flex-col gap-6 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-8">
+        <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-widest text-accent">Your top pick</div>
-          <div className="mt-1 font-display text-5xl leading-none tracking-wide sm:text-6xl">{top.name}</div>
+          <div className="mt-1 break-words font-display text-4xl leading-none tracking-wide sm:text-6xl">{top.name}</div>
           <div className="mt-2 text-sm text-muted">
             {top.year ?? ""} {top.genres.slice(0, 3).join(" · ")}
           </div>
         </div>
-        <div className="flex gap-6 text-right">
+        <div className="flex shrink-0 gap-6 sm:text-right">
           <Stat label="Titles" value={String(titles.length)} />
           <Stat label="Series" value={String(series)} />
           <Stat label="Avg score" value={formatScore(avg)} />
@@ -238,11 +238,11 @@ function PosterCard({ title: t }: { title: Title }) {
         <div className="absolute inset-x-0 bottom-0 translate-y-full space-y-1.5 bg-gradient-to-t from-black via-black/90 to-transparent p-3 pt-8 transition duration-300 group-hover:translate-y-0">
           {CRITERIA.map((c) => (
             <div key={c.key} className="flex items-center gap-2 text-[11px]">
-              <span className="w-16 text-white/70">{c.label}</span>
+              <span className="w-14 shrink-0 truncate text-white/70 sm:w-16">{c.label}</span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
                 <div className={`h-full rounded-full ${scoreTone(t[c.key])}`} style={{ width: `${t[c.key] * 20}%` }} />
               </div>
-              <span className="w-3 text-right tabular-nums text-white">{t[c.key]}</span>
+              <span className="w-3 shrink-0 text-right tabular-nums text-white">{t[c.key]}</span>
             </div>
           ))}
         </div>
@@ -261,10 +261,10 @@ function TitleTable({ titles }: { titles: Title[] }) {
   const { updateTitle } = useStore();
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[820px] text-sm">
+      <table className="w-full min-w-[760px] text-sm">
         <thead className="bg-surface text-left text-xs uppercase tracking-wider text-muted">
           <tr>
-            <th className="px-3 py-3 font-medium">Title</th>
+            <th className="sticky left-0 z-10 bg-surface px-3 py-3 font-medium">Title</th>
             {CRITERIA.map((c) => (
               <th key={c.key} className="px-2 py-3 text-center font-medium" title={"hint" in c ? c.hint : undefined}>
                 {c.label}
@@ -276,9 +276,10 @@ function TitleTable({ titles }: { titles: Title[] }) {
         </thead>
         <tbody className="divide-y divide-border">
           {titles.map((t) => (
-            <tr key={t.id} className="hover:bg-surface/60">
-              <td className="px-3 py-2">
-                <Link href={`/title/${t.id}`} className="flex items-center gap-3 hover:text-accent">
+            <tr key={t.id} className="group hover:bg-surface/60">
+              {/* Title stays pinned while the ratings scroll sideways on narrow screens. */}
+              <td className="sticky left-0 z-10 bg-background px-3 py-2 group-hover:bg-surface">
+                <Link href={`/title/${t.id}`} className="flex max-w-40 items-center gap-3 hover:text-accent sm:max-w-64">
                   <Poster path={t.poster_path} alt="" size="w92" className="h-12 w-8 shrink-0 rounded text-[0px]" />
                   <div className="min-w-0">
                     <div className="truncate font-medium">{t.name}</div>

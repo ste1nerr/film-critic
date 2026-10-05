@@ -87,14 +87,14 @@ export function Modal({
       className={`m-auto w-[calc(100%-2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} rounded-2xl border border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm`}
     >
       {open && (
-        <div className="flex max-h-[85vh] flex-col">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="font-display text-2xl tracking-wide">{title}</h2>
-            <button onClick={onClose} className="rounded-md p-1 text-muted hover:text-foreground" aria-label="Close">
+        <div className="flex max-h-[85dvh] flex-col">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
+            <h2 className="min-w-0 truncate font-display text-2xl tracking-wide">{title}</h2>
+            <button onClick={onClose} className="shrink-0 rounded-md p-1 text-muted hover:text-foreground" aria-label="Close">
               ✕
             </button>
           </div>
-          <div className="overflow-y-auto p-5">{children}</div>
+          <div className="min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5">{children}</div>
         </div>
       )}
     </dialog>
