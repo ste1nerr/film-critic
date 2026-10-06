@@ -21,6 +21,10 @@ Stack: Next.js 16 · Supabase (Postgres, auth, realtime) · TMDB API · optional
    ```
    Open http://localhost:3000, create an account, and use **Import** to load your spreadsheet. From Google Sheets, export it with File → Download → CSV.
 
+## Google Sheets sync (optional)
+
+Keep a Google spreadsheet in two-way sync with the site. Setup is in [`google-sheets/README.md`](google-sheets/README.md).
+
 ## Deploy (Vercel)
 
 Push to GitHub, import the repo on [vercel.com](https://vercel.com), and add the same env vars from `.env.local`.

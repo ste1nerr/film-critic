@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchDetails, metaOf } from "@/lib/api";
-import { tmdbImage } from "@/lib/score";
+import { overallOf, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import type { CriterionKey, Title, TitleDetails } from "@/lib/types";
+import { isRated, type CriterionKey, type Ratings, type Title, type TitleDetails } from "@/lib/types";
 import { RadarChart } from "./RadarChart";
 import { RatingEditor } from "./RatingEditor";
 import { TitleSearch } from "./TitleSearch";
@@ -132,7 +132,11 @@ function TitleView({ title: t }: { title: Title }) {
               <CrowdScore label="TMDB" value={t.tmdb_rating} />
               <div className="flex flex-col items-center">
                 <div className="flex h-16 items-center">
-                  <ScoreBadge value={t.overall} size="lg" />
+                  {t.overall != null ? (
+                    <ScoreBadge value={t.overall} size="lg" />
+                  ) : (
+                    <span className="rounded-2xl border border-border bg-surface/70 px-3 py-2 text-sm text-muted">Watchlist</span>
+                  )}
                 </div>
                 <div className="mt-1 text-xs uppercase tracking-wider text-muted">You</div>
               </div>
@@ -191,13 +195,19 @@ function TitleView({ title: t }: { title: Title }) {
         <aside className="min-w-0 space-y-6">
           <Section title="Your ratings">
             <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="flex justify-center">
-                <RadarChart ratings={t} />
-              </div>
-              <RatingEditor
-                value={t}
-                onChange={(k: CriterionKey, n) => updateTitle(t.id, { [k]: n } as Partial<Title>).catch(fail)}
-              />
+              {isRated(t) ? (
+                <>
+                  <div className="flex justify-center">
+                    <RadarChart ratings={t} />
+                  </div>
+                  <RatingEditor
+                    value={t}
+                    onChange={(k: CriterionKey, n) => updateTitle(t.id, { [k]: n } as Partial<Title>).catch(fail)}
+                  />
+                </>
+              ) : (
+                <FirstRating onSave={(r) => updateTitle(t.id, r).catch(fail)} />
+              )}
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -252,6 +262,25 @@ function TitleView({ title: t }: { title: Title }) {
           }}
         />
       </Modal>
+    </div>
+  );
+}
+
+const DEFAULT_RATINGS: Ratings = { plot: 3, ending: 3, acting: 3, atmosphere: 3, vibe: 3 };
+
+/** Watchlist titles get all five ratings in one save; the database rejects a partial set. */
+function FirstRating({ onSave }: { onSave(r: Ratings): void }) {
+  const [draft, setDraft] = useState<Ratings>(DEFAULT_RATINGS);
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">On your watchlist. Seen it? Rate it:</p>
+      <RatingEditor value={draft} onChange={(k, n) => setDraft((d) => ({ ...d, [k]: n }))} />
+      <div className="flex items-center justify-between gap-3">
+        <ScoreBadge value={overallOf(draft)} />
+        <Button variant="primary" onClick={() => onSave(draft)}>
+          Save rating
+        </Button>
+      </div>
     </div>
   );
 }

@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { formatScore } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import { CRITERIA, type Title } from "@/lib/types";
+import { CRITERIA, isRated, type RatedTitle } from "@/lib/types";
 import { crowdGap } from "./Library";
 import { Poster, ScoreBadge } from "./ui";
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
 export function Stats() {
-  const { titles } = useStore();
+  const all = useStore().titles;
+  const titles = useMemo(() => all.filter(isRated), [all]);
 
   const data = useMemo(() => {
     const criteria = CRITERIA.map((c) => ({ label: c.label, value: avg(titles.map((t) => t[c.key])) }));
@@ -30,7 +31,7 @@ export function Stats() {
 
     const withGap = titles
       .map((t) => ({ t, gap: crowdGap(t) }))
-      .filter((x): x is { t: Title; gap: number } => x.gap != null);
+      .filter((x): x is { t: RatedTitle; gap: number } => x.gap != null);
     const loved = withGap.filter((x) => x.gap > 0).sort((a, b) => b.gap - a.gap).slice(0, 5);
     const disliked = withGap.filter((x) => x.gap < 0).sort((a, b) => a.gap - b.gap).slice(0, 5);
 
@@ -158,7 +159,7 @@ function Histogram({ items }: { items: { label: string; value: number }[] }) {
   );
 }
 
-function GapList({ items }: { items: { t: Title; gap: number }[] }) {
+function GapList({ items }: { items: { t: RatedTitle; gap: number }[] }) {
   if (!items.length) return <p className="text-sm text-muted">Nothing here yet.</p>;
   return (
     <ul className="space-y-2">

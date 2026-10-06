@@ -1,7 +1,10 @@
-import { CRITERIA, type Ratings } from "./types";
+import { CRITERIA, type MaybeRatings, type Ratings } from "./types";
 
-export function overallOf(r: Ratings): number {
-  const sum = CRITERIA.reduce((acc, c) => acc + r[c.key], 0);
+export function overallOf(r: Ratings): number;
+export function overallOf(r: MaybeRatings): number | null;
+export function overallOf(r: MaybeRatings): number | null {
+  if (CRITERIA.some((c) => r[c.key] == null)) return null;
+  const sum = CRITERIA.reduce((acc, c) => acc + (r[c.key] ?? 0), 0);
   return Math.round((sum / CRITERIA.length) * 10) / 10;
 }
 

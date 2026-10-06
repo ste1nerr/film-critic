@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatScore, scoreTone, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import { CRITERIA, type CriterionKey, type Title } from "@/lib/types";
+import { CRITERIA, isRated, type CriterionKey, type RatedTitle, type Title } from "@/lib/types";
 import { Poster, ScoreBadge, Spinner } from "./ui";
 
 type View = "grid" | "table";
+type Shelf = "rated" | "watchlist";
 type TypeFilter = "all" | "movie" | "tv";
 type Sort = "overall-desc" | "overall-asc" | "name" | "year" | "added" | "vs-crowd";
 
@@ -23,14 +24,15 @@ const SORTS: { value: Sort; label: string }[] = [
 /** Your 1–5 overall vs the crowd's 0–10, both on a 10-point scale. */
 export function crowdGap(t: Title) {
   const crowd = t.imdb_rating ?? t.tmdb_rating;
-  return crowd == null ? null : t.overall * 2 - crowd;
+  return crowd == null || t.overall == null ? null : t.overall * 2 - crowd;
 }
 
 function sortTitles(list: Title[], sort: Sort) {
   const copy = list.slice();
+  const score = (t: Title) => t.overall ?? 0;
   const by = {
-    "overall-desc": (a: Title, b: Title) => b.overall - a.overall || a.name.localeCompare(b.name),
-    "overall-asc": (a: Title, b: Title) => a.overall - b.overall || a.name.localeCompare(b.name),
+    "overall-desc": (a: Title, b: Title) => score(b) - score(a) || a.name.localeCompare(b.name),
+    "overall-asc": (a: Title, b: Title) => score(a) - score(b) || a.name.localeCompare(b.name),
     name: (a: Title, b: Title) => a.name.localeCompare(b.name),
     year: (a: Title, b: Title) => (b.year ?? 0) - (a.year ?? 0),
     added: (a: Title, b: Title) => b.created_at.localeCompare(a.created_at),
@@ -61,24 +63,29 @@ export function Library() {
   const { titles, loading, error } = useStore();
   const [view, setView] = usePersisted<View>("fc:view", "grid");
   const [sort, setSort] = usePersisted<Sort>("fc:sort", "overall-desc");
+  const [shelf, setShelf] = usePersisted<Shelf>("fc:shelf", "rated");
   const [type, setType] = useState<TypeFilter>("all");
   const [genre, setGenre] = useState("");
   const [query, setQuery] = useState("");
 
   const genres = useMemo(() => [...new Set(titles.flatMap((t) => t.genres))].sort(), [titles]);
+  const rated = useMemo(() => titles.filter(isRated), [titles]);
+  const watchCount = titles.length - rated.length;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sortTitles(
       titles.filter(
         (t) =>
+          isRated(t) === (shelf === "rated") &&
           (type === "all" || t.media_type === type) &&
           (!genre || t.genres.includes(genre)) &&
           (!q || t.name.toLowerCase().includes(q)),
       ),
-      sort,
+      // Watchlist titles have no score, so score sorts fall back to most recent.
+      shelf === "watchlist" && sort.startsWith("overall") ? "added" : sort,
     );
-  }, [titles, type, genre, query, sort]);
+  }, [titles, shelf, type, genre, query, sort]);
 
   if (loading && !titles.length) {
     return (
@@ -90,11 +97,19 @@ export function Library() {
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-6">
-      <Hero titles={titles} />
+      <Hero titles={rated} />
 
       {error && <p className="mb-4 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
 
       <div className="mb-5 flex flex-wrap items-stretch gap-2">
+        <Segmented<Shelf>
+          value={shelf}
+          onChange={setShelf}
+          options={[
+            { value: "rated", label: `Rated · ${rated.length}` },
+            { value: "watchlist", label: `Watchlist · ${watchCount}` },
+          ]}
+        />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -144,7 +159,13 @@ export function Library() {
       {!titles.length ? (
         <Empty />
       ) : !visible.length ? (
-        <p className="py-16 text-center text-muted">Nothing matches these filters.</p>
+        <p className="py-16 text-center text-muted">
+          {shelf === "watchlist" && !watchCount
+            ? "Your watchlist is empty. Add a title and choose “Want to watch”."
+            : shelf === "rated" && !rated.length
+              ? "Nothing rated yet."
+              : "Nothing matches these filters."}
+        </p>
       ) : view === "grid" ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {visible.map((t) => (
@@ -182,8 +203,8 @@ function Segmented<T extends string>({
   );
 }
 
-function Hero({ titles }: { titles: Title[] }) {
-  const top = useMemo(() => titles.reduce<Title | null>((best, t) => (!best || t.overall > best.overall ? t : best), null), [titles]);
+function Hero({ titles }: { titles: RatedTitle[] }) {
+  const top = useMemo(() => titles.reduce<RatedTitle | null>((best, t) => (!best || t.overall > best.overall ? t : best), null), [titles]);
   if (!titles.length || !top) return null;
 
   const avg = titles.reduce((s, t) => s + t.overall, 0) / titles.length;
@@ -232,20 +253,28 @@ function PosterCard({ title: t }: { title: Title }) {
     <Link href={`/title/${t.id}`} className="group block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/40 transition duration-300 group-hover:-translate-y-1 group-hover:border-accent/60">
         <Poster path={t.poster_path} alt={t.name} className="size-full" />
-        <div className="absolute right-2 top-2">
-          <ScoreBadge value={t.overall} />
-        </div>
-        <div className="absolute inset-x-0 bottom-0 translate-y-full space-y-1.5 bg-gradient-to-t from-black via-black/90 to-transparent p-3 pt-8 transition duration-300 group-hover:translate-y-0">
-          {CRITERIA.map((c) => (
-            <div key={c.key} className="flex items-center gap-2 text-[11px]">
-              <span className="w-14 shrink-0 truncate text-white/70 sm:w-16">{c.label}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
-                <div className={`h-full rounded-full ${scoreTone(t[c.key])}`} style={{ width: `${t[c.key] * 20}%` }} />
-              </div>
-              <span className="w-3 shrink-0 text-right tabular-nums text-white">{t[c.key]}</span>
+        {isRated(t) ? (
+          <>
+            <div className="absolute right-2 top-2">
+              <ScoreBadge value={t.overall} />
             </div>
-          ))}
-        </div>
+            <div className="absolute inset-x-0 bottom-0 translate-y-full space-y-1.5 bg-gradient-to-t from-black via-black/90 to-transparent p-3 pt-8 transition duration-300 group-hover:translate-y-0">
+              {CRITERIA.map((c) => (
+                <div key={c.key} className="flex items-center gap-2 text-[11px]">
+                  <span className="w-14 shrink-0 truncate text-white/70 sm:w-16">{c.label}</span>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
+                    <div className={`h-full rounded-full ${scoreTone(t[c.key])}`} style={{ width: `${t[c.key] * 20}%` }} />
+                  </div>
+                  <span className="w-3 shrink-0 text-right tabular-nums text-white">{t[c.key]}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black via-black/90 to-transparent p-3 pt-8 text-center text-xs font-medium text-white transition duration-300 group-hover:translate-y-0">
+            Rate it →
+          </div>
+        )}
       </div>
       <div className="mt-2 truncate text-sm font-medium" title={t.name}>
         {t.name}
@@ -289,14 +318,25 @@ function TitleTable({ titles }: { titles: Title[] }) {
                   </div>
                 </Link>
               </td>
-              {CRITERIA.map((c) => (
-                <td key={c.key} className="px-2 py-2 text-center">
-                  <RatingCell value={t[c.key]} onChange={(n) => updateTitle(t.id, { [c.key]: n } as Record<CriterionKey, number>).catch((e) => alert(e.message))} label={`${t.name} ${c.label}`} />
+              {isRated(t) ? (
+                <>
+                  {CRITERIA.map((c) => (
+                    <td key={c.key} className="px-2 py-2 text-center">
+                      <RatingCell value={t[c.key]} onChange={(n) => updateTitle(t.id, { [c.key]: n } as Record<CriterionKey, number>).catch((e) => alert(e.message))} label={`${t.name} ${c.label}`} />
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-center">
+                    <ScoreBadge value={t.overall} size="sm" />
+                  </td>
+                </>
+              ) : (
+                // All five are set at once on the title page; a partial set isn't allowed.
+                <td colSpan={CRITERIA.length + 1} className="px-3 py-2 text-center">
+                  <Link href={`/title/${t.id}`} className="text-accent hover:underline">
+                    Rate it →
+                  </Link>
                 </td>
-              ))}
-              <td className="px-3 py-2 text-center">
-                <ScoreBadge value={t.overall} size="sm" />
-              </td>
+              )}
               <td className="px-3 py-2 text-center tabular-nums text-muted">
                 {t.imdb_rating ?? "—"} / {t.tmdb_rating ?? "—"}
               </td>

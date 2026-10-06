@@ -6,12 +6,12 @@ create table if not exists public.titles (
   name          text not null,
   media_type    text not null default 'movie' check (media_type in ('movie', 'tv')),
 
-  -- your ratings, 1–5
-  plot          smallint not null check (plot between 1 and 5),
-  ending        smallint not null check (ending between 1 and 5),
-  acting        smallint not null check (acting between 1 and 5),
-  atmosphere    smallint not null check (atmosphere between 1 and 5),
-  vibe          smallint not null check (vibe between 1 and 5),
+  -- your ratings, 1–5; all null = on the watchlist, not rated yet
+  plot          smallint check (plot between 1 and 5),
+  ending        smallint check (ending between 1 and 5),
+  acting        smallint check (acting between 1 and 5),
+  atmosphere    smallint check (atmosphere between 1 and 5),
+  vibe          smallint check (vibe between 1 and 5),
   overall       numeric(2, 1) generated always as
                   (round((plot + ending + acting + atmosphere + vibe)::numeric / 5, 1)) stored,
   note          text,
@@ -29,7 +29,11 @@ create table if not exists public.titles (
   runtime       smallint,
 
   created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  updated_at    timestamptz not null default now(),
+
+  constraint titles_ratings_all_or_none check (
+    num_nulls(plot, ending, acting, atmosphere, vibe) in (0, 5)
+  )
 );
 
 create index if not exists titles_user_id_idx on public.titles (user_id);

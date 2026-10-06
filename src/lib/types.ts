@@ -10,6 +10,8 @@ export const CRITERIA = [
 
 export type CriterionKey = (typeof CRITERIA)[number]["key"];
 export type Ratings = Record<CriterionKey, number>;
+/** All five null = on the watchlist. The database rejects a partial set. */
+export type MaybeRatings = Record<CriterionKey, number | null>;
 
 /** Everything we cache from TMDB/OMDb on a title row. */
 export interface TitleMeta {
@@ -27,16 +29,22 @@ export interface TitleMeta {
   runtime: number | null;
 }
 
-export interface Title extends TitleMeta, Ratings {
+export interface Title extends TitleMeta, MaybeRatings {
   id: string;
   user_id: string;
-  overall: number;
+  overall: number | null;
   note: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type TitleInput = TitleMeta & Ratings & { note?: string | null };
+export type RatedTitle = Title & Ratings & { overall: number };
+
+export const isRated = (t: Title): t is RatedTitle => t.overall != null;
+
+export const NO_RATINGS: MaybeRatings = { plot: null, ending: null, acting: null, atmosphere: null, vibe: null };
+
+export type TitleInput = TitleMeta & MaybeRatings & { note?: string | null };
 
 export interface SearchResult {
   tmdb_id: number;

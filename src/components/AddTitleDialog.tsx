@@ -5,7 +5,7 @@ import { useState } from "react";
 import { emptyMeta, fetchDetails, metaOf } from "@/lib/api";
 import { overallOf } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import type { MediaType, Ratings, SearchResult } from "@/lib/types";
+import { NO_RATINGS, type MediaType, type MaybeRatings, type Ratings, type SearchResult } from "@/lib/types";
 import { RatingEditor } from "./RatingEditor";
 import { TitleSearch } from "./TitleSearch";
 import { Button, Modal, Poster, ScoreBadge } from "./ui";
@@ -36,7 +36,8 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
       ? titles.find((t) => t.tmdb_id === pick.result.tmdb_id && t.media_type === pick.result.media_type)
       : undefined;
 
-  async function save() {
+  /** NO_RATINGS puts the title on the watchlist. */
+  async function save(scores: MaybeRatings) {
     if (!pick) return;
     setSaving(true);
     setError(null);
@@ -45,7 +46,7 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
         pick.kind === "tmdb"
           ? metaOf(await fetchDetails(pick.result.media_type, pick.result.tmdb_id))
           : emptyMeta(pick.name, pick.media_type);
-      const row = await addTitle({ ...meta, ...ratings, note: note.trim() || null });
+      const row = await addTitle({ ...meta, ...scores, note: note.trim() || null });
       close();
       router.push(`/title/${row.id}`);
     } catch (e) {
@@ -107,7 +108,7 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
 
           {duplicate && (
             <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">
-              Already in your list with {duplicate.overall.toFixed(1)}. Saving adds a second entry.
+              Already in your list{duplicate.overall != null ? ` with ${duplicate.overall.toFixed(1)}` : ", on the watchlist"}. Saving adds a second entry.
             </p>
           )}
 
@@ -123,10 +124,13 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
 
           {error && <p className="text-sm text-rose-300">{error}</p>}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={close}>Cancel</Button>
-            <Button variant="primary" onClick={save} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
+            <Button onClick={() => save(NO_RATINGS)} disabled={saving}>
+              Want to watch
+            </Button>
+            <Button variant="primary" onClick={() => save(ratings)} disabled={saving}>
+              {saving ? "Saving…" : "Save rating"}
             </Button>
           </div>
         </div>
