@@ -30,7 +30,8 @@ const HEADERS = [
   'Year',
   'id',
 ];
-const OVERALL_FORMULA = '=IF(COUNT(RC[-5]:RC[-1])=5,ROUND(AVERAGE(RC[-5]:RC[-1]),1),"")';
+// A1, not R1C1: R1C1 references don't parse in some spreadsheet locales.
+const overallFormula = (row) => '=IF(COUNT(B' + row + ':F' + row + ')=5,ROUND(AVERAGE(B' + row + ':F' + row + '),1),"")';
 const COLORS = {
   header: '#fff2cc',
   overallHeader: '#a4c2f4',
@@ -326,7 +327,7 @@ function fillTab(sheet, rows) {
   if (!rows.length) return;
   const values = rows.map((r) => [r.name].concat(CRITERIA.map((k) => blank(r.ratings[k]))));
   sheet.getRange(2, 1, rows.length, 6).setValues(values);
-  sheet.getRange(2, COL.overall, rows.length).setFormulaR1C1(OVERALL_FORMULA);
+  sheet.getRange(2, COL.overall, rows.length).setFormulas(rows.map((_, i) => [overallFormula(i + 2)]));
 }
 
 function linkWithDatabase() {
@@ -581,7 +582,9 @@ function writeMeta(sheet, row, rec) {
 
 function ensureOverallFormula(sheet, row) {
   const cell = sheet.getRange(row, COL.overall);
-  if (!cell.getFormula()) cell.setFormulaR1C1(OVERALL_FORMULA);
+  // Rows move when others are deleted, so compare rather than just check for presence.
+  const formula = overallFormula(row);
+  if (cell.getFormula() !== formula) cell.setFormula(formula);
 }
 
 function mark(sheet, row, state, message) {
@@ -661,7 +664,8 @@ function isStale(rec) {
 
 function supabase(method, path, body) {
   const c = config();
-  const key = c.SUPABASE_SERVICE_KEY;
+  // Pasted keys sometimes pick up spaces or line breaks.
+  const key = c.SUPABASE_SERVICE_KEY.replace(/\s+/g, '');
   const headers = { apikey: key, Prefer: 'return=representation' };
   // Legacy service_role keys are JWTs and also go in Authorization; new sb_secret_ keys don't.
   if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key;
