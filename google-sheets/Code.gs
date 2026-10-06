@@ -253,27 +253,42 @@ function fullSync() {
  * Builds the two tabs from the old sheets: the first tab of this file (movies) and the first
  * tab of the series file (SERIES_SPREADSHEET_ID). Old tabs are kept as "(старе)" backups.
  * Then links every row to the database: by name, then TMDB id, then identical ratings.
+ * Safe to re-run after a failure: it reuses the backup and rebuilds tabs that aren't linked yet.
  */
 function migrateOldSheets() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActive();
-  if (ss.getSheetByName(MOVIES + ' (старе)')) return ui.alert('Вже перенесено. Для оновлення використовуй «Повна синхронізація».');
+  const linked = tabs().some((sheet) => readAll(sheet).some((r) => r.id));
+  if (linked) return ui.alert('Вже перенесено. Для оновлення використовуй «Повна синхронізація».');
 
   const seriesRef = PropertiesService.getScriptProperties().getProperty('SERIES_SPREADSHEET_ID');
   if (!seriesRef) return ui.alert('Додай Script property SERIES_SPREADSHEET_ID: посилання на файл серікритик.');
   const seriesId = (seriesRef.match(/\/d\/([^/]+)/) || [null, seriesRef])[1].trim();
 
-  const movieSource = ss.getSheets()[0];
+  // Leftovers of an earlier run that stopped halfway. MOVIES/SERIES only count as leftovers
+  // once the backup exists; before that, MOVIES may be the original tab itself.
+  const resumed = !!ss.getSheetByName(MOVIES + ' (старе)');
+  const leftovers = [MOVIES + ' (нове)', SERIES + ' (нове)'].concat(resumed ? [MOVIES, SERIES] : []);
+  for (const name of leftovers) {
+    const sheet = ss.getSheetByName(name);
+    if (sheet) ss.deleteSheet(sheet);
+  }
+
+  const movieSource = ss.getSheetByName(MOVIES + ' (старе)') || ss.getSheets()[0];
   const seriesSource = SpreadsheetApp.openById(seriesId).getSheets()[0];
   const movieRows = readOldSheet(movieSource);
   const seriesRows = readOldSheet(seriesSource);
 
-  movieSource.setName(MOVIES + ' (старе)');
-  seriesSource.copyTo(ss).setName(SERIES + ' (старе)');
-  const movies = createTab(ss, MOVIES, 0);
-  const series = createTab(ss, SERIES, 1);
+  // Build under temporary names first, so a failure here leaves the old tabs untouched.
+  const movies = createTab(ss, MOVIES + ' (нове)', 0);
+  const series = createTab(ss, SERIES + ' (нове)', 1);
   fillTab(movies, movieRows);
   fillTab(series, seriesRows);
+
+  if (movieSource.getName() !== MOVIES + ' (старе)') movieSource.setName(MOVIES + ' (старе)');
+  if (!ss.getSheetByName(SERIES + ' (старе)')) seriesSource.copyTo(ss).setName(SERIES + ' (старе)');
+  movies.setName(MOVIES);
+  series.setName(SERIES);
   SpreadsheetApp.flush();
 
   linkWithDatabase();
@@ -409,7 +424,9 @@ function createTab(ss, name, index) {
   sheet.getRange(2, COL.year, rows).setHorizontalAlignment('center').setNumberFormat('0');
 
   const rule = SpreadsheetApp.newDataValidation()
-    .requireFormulaSatisfied('=OR(B2=0,AND(B2>=1,B2<=5,B2=INT(B2)))')
+    // A formula rule breaks in locales that use ";" as the argument separator.
+    // Fractions get through here but syncRow rejects them.
+    .requireNumberBetween(0, 5)
     .setAllowInvalid(false)
     .setHelpText('Ціле число від 1 до 5. Порожньо = хочу подивитись.')
     .build();
