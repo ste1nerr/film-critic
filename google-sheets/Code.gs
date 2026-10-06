@@ -30,8 +30,12 @@ const HEADERS = [
   'Year',
   'id',
 ];
-// A1, not R1C1: R1C1 references don't parse in some spreadsheet locales.
-const overallFormula = (row) => '=IF(COUNT(B' + row + ':F' + row + ')=5,ROUND(AVERAGE(B' + row + ':F' + row + '),1),"")';
+// Overall is written as a value, not a formula: formulas set from a script broke in this
+// spreadsheet's locale. Same rounding as the database's generated column.
+function overallOf(ratings) {
+  if (CRITERIA.some((k) => ratings[k] == null)) return '';
+  return Math.round((CRITERIA.reduce((sum, k) => sum + ratings[k], 0) / CRITERIA.length) * 10) / 10;
+}
 const COLORS = {
   header: '#fff2cc',
   overallHeader: '#a4c2f4',
@@ -107,7 +111,7 @@ function onEditInstalled(e) {
 function syncRow(sheet, row) {
   const r = readRow(sheet, row);
   if (!r.name) return;
-  ensureOverallFormula(sheet, row);
+  sheet.getRange(row, COL.overall).setValue(overallOf(r.ratings));
 
   if (r.bad) return mark(sheet, row, 'error', 'Оцінка має бути цілим числом від 1 до 5. Порожньо = хочу подивитись.');
   if (r.filled > 0 && r.filled < 5) return mark(sheet, row, 'ok', 'Постав усі 5 оцінок, тоді збережеться на сайті.');
@@ -147,7 +151,7 @@ function createFromRow(sheet, row, r, meta) {
   remember(created);
   // Ratings stay as typed: the user may already be filling in the next one.
   writeMeta(sheet, row, created);
-  ensureOverallFormula(sheet, row);
+  sheet.getRange(row, COL.overall).setValue(overallOf(r.ratings));
   mark(sheet, row, meta ? 'ok' : 'notFound', meta ? '' : 'Не знайдено в TMDB, тому без постера. Виправ назву або знайди фільм на сайті (Find it on TMDB).');
   return created;
 }
@@ -259,8 +263,11 @@ function fullSync() {
 function migrateOldSheets() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActive();
-  const linked = tabs().some((sheet) => readAll(sheet).some((r) => r.id));
-  if (linked) return ui.alert('Вже перенесено. Для оновлення використовуй «Повна синхронізація».');
+  // Tabs already built by an earlier run: just finish linking the rows that aren't linked yet.
+  if (ss.getSheetByName(MOVIES + ' (старе)') && ss.getSheetByName(MOVIES) && ss.getSheetByName(SERIES)) {
+    const done = linkWithDatabase();
+    return ui.alert('Зв’язано з сайтом ще ' + done + ' рядк(ів). Якщо щось лишилось незв’язаним, запусти ще раз.');
+  }
 
   const seriesRef = PropertiesService.getScriptProperties().getProperty('SERIES_SPREADSHEET_ID');
   if (!seriesRef) return ui.alert('Додай Script property SERIES_SPREADSHEET_ID: посилання на файл серікритик.');
@@ -270,6 +277,7 @@ function migrateOldSheets() {
   // once the backup exists; before that, MOVIES may be the original tab itself.
   const resumed = !!ss.getSheetByName(MOVIES + ' (старе)');
   const leftovers = [MOVIES + ' (нове)', SERIES + ' (нове)'].concat(resumed ? [MOVIES, SERIES] : []);
+  // (Both MOVIES and SERIES present was handled above; here at most one of them is a leftover.)
   for (const name of leftovers) {
     const sheet = ss.getSheetByName(name);
     if (sheet) ss.deleteSheet(sheet);
@@ -327,11 +335,19 @@ function fillTab(sheet, rows) {
   if (!rows.length) return;
   const values = rows.map((r) => [r.name].concat(CRITERIA.map((k) => blank(r.ratings[k]))));
   sheet.getRange(2, 1, rows.length, 6).setValues(values);
-  sheet.getRange(2, COL.overall, rows.length).setFormulas(rows.map((_, i) => [overallFormula(i + 2)]));
+  sheet.getRange(2, COL.overall, rows.length).setValues(rows.map((r) => [overallOf(r.ratings)]));
 }
 
+/**
+ * Links unlinked rows to database titles (or creates them) and appends titles missing from
+ * the sheet. Returns how many rows it linked. Runs under one lock with no per-row flush:
+ * hundreds of small flushes made Google fail with a server error. No webhook is set up
+ * during migration, so holding the lock this long is fine.
+ */
 function linkWithDatabase() {
   const free = new Map(fetchTitles().map((r) => [r.id, r]));
+  // Rows linked by an earlier, interrupted run.
+  for (const sheet of tabs()) readAll(sheet).forEach((r) => r.id && free.delete(r.id));
   const take = (rec) => {
     free.delete(rec.id);
     return rec;
@@ -365,11 +381,10 @@ function linkWithDatabase() {
     if (same.length === 1) x.match = take(same[0]);
   }
 
-  for (const x of pending) {
-    withLock(() => {
+  let done = 0;
+  withLock(() => {
+    for (const x of pending) {
       if (x.match) {
-        // id first, so the webhook for the patch below finds the row.
-        x.sheet.getRange(x.row, COL.id).setValue(x.match.id);
         const patch = {};
         const note = joinNote(splitName(x.r.name).extra, x.match.note);
         if (note !== x.match.note) patch.note = note;
@@ -379,24 +394,31 @@ function linkWithDatabase() {
         remember(rec);
         writeRecord(x.sheet, x.row, rec);
         mark(x.sheet, x.row, 'ok');
+        done++;
       } else if (x.r.filled === 0 || x.r.filled === 5) {
         try {
           createFromRow(x.sheet, x.row, x.r, x.meta);
+          done++;
         } catch (err) {
           mark(x.sheet, x.row, 'error', String(err.message).slice(0, 500));
         }
       }
-    });
-  }
+    }
 
-  // Titles that are on the site but weren't in the old sheets.
-  withLock(() => {
+    // Titles that are on the site but weren't in the old sheets.
     for (const rec of free.values()) {
       const sheet = tabFor(rec.media_type);
       remember(rec);
       writeRecord(sheet, appendRow(sheet), rec);
     }
+
+    // Replaces formulas left by earlier versions of this script.
+    for (const sheet of tabs()) {
+      const rows = readAll(sheet);
+      if (rows.length) sheet.getRange(2, COL.overall, rows.length).setValues(rows.map((r) => [overallOf(r.ratings)]));
+    }
   });
+  return done;
 }
 
 function createTab(ss, name, index) {
@@ -571,20 +593,14 @@ function locate(id) {
 /** Name, note, year, id; ratings only when the title has them (a watchlist row may be mid-typing). */
 function writeRecord(sheet, row, rec) {
   writeMeta(sheet, row, rec);
-  if (rec.overall != null) sheet.getRange(row, COL.plot, 1, 5).setValues([CRITERIA.map((k) => blank(rec[k]))]);
-  ensureOverallFormula(sheet, row);
+  if (rec.overall != null) {
+    sheet.getRange(row, COL.plot, 1, 6).setValues([CRITERIA.map((k) => blank(rec[k])).concat([rec.overall])]);
+  }
 }
 
 function writeMeta(sheet, row, rec) {
   sheet.getRange(row, COL.name).setValue(rec.name);
   sheet.getRange(row, COL.note, 1, 3).setValues([[blank(rec.note), blank(rec.year), rec.id]]);
-}
-
-function ensureOverallFormula(sheet, row) {
-  const cell = sheet.getRange(row, COL.overall);
-  // Rows move when others are deleted, so compare rather than just check for presence.
-  const formula = overallFormula(row);
-  if (cell.getFormula() !== formula) cell.setFormula(formula);
 }
 
 function mark(sheet, row, state, message) {
