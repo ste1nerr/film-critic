@@ -468,12 +468,13 @@ function showSupabaseSql() {
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty('WEBHOOK_SECRET')) props.setProperty('WEBHOOK_SECRET', Utilities.getUuid());
   const secret = props.getProperty('WEBHOOK_SECRET');
-  const url = ScriptApp.getService().getUrl() || '';
+  // Not ScriptApp.getService().getUrl(): it returns a different /exec than the deployment's.
+  const url = props.getProperty('WEBAPP_URL') || '';
 
   const html = HtmlService.createHtmlOutput(
     '<div style="font:13px sans-serif">' +
       '<p>1. Встав URL з <b>Deploy → Manage deployments</b> (закінчується на <code>/exec</code>):</p>' +
-      '<input id="url" style="width:100%;padding:6px" value="' + url.replace(/"/g, '') + '">' +
+      '<input id="url" style="width:100%;padding:6px" placeholder="https://script.google.com/macros/s/…/exec" value="' + url.replace(/"/g, '') + '">' +
       '<p>2. Скопіюй SQL і виконай у <b>Supabase → SQL Editor → Run</b>:</p>' +
       '<textarea id="sql" style="width:100%;height:300px;font:12px monospace" readonly></textarea>' +
       '</div>' +
@@ -482,12 +483,17 @@ function showSupabaseSql() {
       'const secret=' + JSON.stringify(secret) + ';' +
       'const url=document.getElementById("url"),sql=document.getElementById("sql");' +
       'function render(){sql.value=tpl.replace("{{URL}}",url.value.trim()+"?secret="+secret)}' +
-      'url.oninput=render;render();sql.onfocus=()=>sql.select();' +
+      'url.oninput=render;url.onchange=()=>google.script.run.saveWebAppUrl(url.value.trim());' +
+      'render();sql.onfocus=()=>sql.select();' +
       '</script>',
   )
     .setWidth(720)
     .setHeight(480);
   SpreadsheetApp.getUi().showModalDialog(html, 'SQL для Supabase');
+}
+
+function saveWebAppUrl(url) {
+  if (/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) PropertiesService.getScriptProperties().setProperty('WEBAPP_URL', url);
 }
 
 // Same as supabase/sheets-sync.sql.
