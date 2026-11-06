@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDetails, metaOf } from "@/lib/api";
 import { overallOf, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
@@ -41,6 +41,10 @@ function TitleView({ title: t }: { title: Title }) {
   const [details, setDetails] = useState<TitleDetails | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [note, setNote] = useState(t.note ?? "");
+  // Last note sent to the database, and the latest draft for the unload/unmount handlers.
+  const savedNote = useRef(t.note ?? "");
+  const draftNote = useRef(note);
+  const pendingNote = useRef(0);
   const [rematching, setRematching] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -53,7 +57,45 @@ function TitleView({ title: t }: { title: Title }) {
     return () => ctrl.abort();
   }, [t.media_type, t.tmdb_id]);
 
-  const fail = (e: unknown) => alert((e as Error).message);
+  const fail = (e: unknown) => {
+    console.error(e);
+    alert((e as Error).message);
+  };
+
+  const saveNote = useCallback(
+    (value: string) => {
+      const next = value.trim();
+      if (next === savedNote.current) return;
+      const previous = savedNote.current;
+      savedNote.current = next;
+      pendingNote.current++;
+      updateTitle(t.id, { note: next || null })
+        .catch((e) => {
+          savedNote.current = previous;
+          console.error(e);
+          alert((e as Error).message);
+        })
+        .finally(() => pendingNote.current--);
+    },
+    [t.id, updateTitle],
+  );
+
+  // Saves while typing, so a reload without leaving the field doesn't lose the note.
+  useEffect(() => {
+    const timer = setTimeout(() => saveNote(note), 800);
+    return () => clearTimeout(timer);
+  }, [note, saveNote]);
+
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (draftNote.current.trim() !== savedNote.current || pendingNote.current > 0) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      saveNote(draftNote.current);
+    };
+  }, [saveNote]);
 
   async function refreshMeta(type = t.media_type, tmdbId = t.tmdb_id) {
     if (!tmdbId) return;
@@ -210,8 +252,11 @@ function TitleView({ title: t }: { title: Title }) {
               )}
               <textarea
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
-                onBlur={() => note !== (t.note ?? "") && updateTitle(t.id, { note: note.trim() || null }).catch(fail)}
+                onChange={(e) => {
+                  draftNote.current = e.target.value;
+                  setNote(e.target.value);
+                }}
+                onBlur={() => saveNote(note)}
                 placeholder="Your notes…"
                 rows={3}
                 className="mt-4 w-full resize-none rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent"

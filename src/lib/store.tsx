@@ -145,10 +145,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return CRITERIA.some((c) => c.key in patch) ? { ...next, overall: overallOf(next) } : next;
         }),
       );
-      const { error } = await db().from("titles").update(patch).eq("id", id);
-      if (error) {
+      // RLS turns a forbidden update into "0 rows, no error"; select the row to notice that.
+      const { data, error } = await db().from("titles").update(patch).eq("id", id).select("id");
+      if (error || !data?.length) {
         await reload();
-        throw error;
+        throw error ?? new Error("Not saved: this title wasn't found in your library. Reload the page.");
       }
     },
     [reload],
