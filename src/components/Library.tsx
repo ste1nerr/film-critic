@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatScore, scoreTone, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
 import { CRITERIA, isRated, TYPE_LABEL, type CriterionKey, type MediaType, type RatedTitle, type Title } from "@/lib/types";
@@ -41,15 +41,16 @@ function sortTitles(list: Title[], sort: Sort) {
   return copy.sort(by);
 }
 
+/** Read on first render, so the saved shelf and view don't flash in after the default one. */
 function usePersisted<T extends string>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(initial);
-  useEffect(() => {
+  // The library only renders client-side, after sign-in, so localStorage is available here.
+  const [value, setValue] = useState<T>(() => {
     try {
-      const saved = localStorage.getItem(key);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from storage after mount
-      if (saved) setValue(saved as T);
-    } catch {}
-  }, [key]);
+      return (localStorage.getItem(key) as T | null) ?? initial;
+    } catch {
+      return initial;
+    }
+  });
   const set = (v: T) => {
     setValue(v);
     try {
@@ -67,6 +68,8 @@ export function Library() {
   const [type, setType] = useState<TypeFilter>("all");
   const [genre, setGenre] = useState("");
   const [query, setQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtered = type !== "all" || !!genre;
 
   const genres = useMemo(() => [...new Set(titles.flatMap((t) => t.genres))].sort(), [titles]);
   const rated = useMemo(() => titles.filter(isRated), [titles]);
@@ -103,6 +106,7 @@ export function Library() {
 
       <div className="mb-5 flex flex-wrap items-stretch gap-2">
         <Segmented<Shelf>
+          className="basis-full sm:basis-auto"
           value={shelf}
           onChange={setShelf}
           options={[
@@ -114,47 +118,61 @@ export function Library() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by name…"
-          className="min-w-0 flex-1 basis-full rounded-lg sm:basis-48 border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent"
+          className="min-w-0 flex-1 rounded-lg sm:basis-48 border border-border bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-accent"
         />
-        <Segmented<TypeFilter>
-          value={type}
-          onChange={setType}
-          options={[
-            { value: "all", label: "All" },
-            { value: "movie", label: "Movies" },
-            { value: "tv", label: "Series" },
-            { value: "anime", label: "Anime" },
-          ]}
-        />
-        <select
-          value={genre}
-          onChange={(e) => setGenre(e.target.value)}
-          className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
+        {/* On phones the rest of the controls fold behind this button; from sm up they sit inline. */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          className={`relative shrink-0 rounded-lg border px-3 py-2 text-sm sm:hidden ${filtersOpen ? "border-accent text-foreground" : "border-border text-muted"} bg-surface`}
         >
-          <option value="">All genres</option>
-          {genres.map((g) => (
-            <option key={g}>{g}</option>
-          ))}
-        </select>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
-        >
-          {SORTS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <Segmented<View>
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "grid", label: "▦ Grid" },
-            { value: "table", label: "☰ Table" },
-          ]}
-        />
+          Filters
+          {filtered && <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-accent" />}
+        </button>
+        <div className={`${filtersOpen ? "flex" : "hidden"} basis-full flex-wrap gap-2 sm:contents`}>
+          <Segmented<TypeFilter>
+            className="basis-full sm:basis-auto"
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "all", label: "All" },
+              { value: "movie", label: "Movies" },
+              { value: "tv", label: "Series" },
+              { value: "anime", label: "Anime" },
+            ]}
+          />
+          <select
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
+          >
+            <option value="">All genres</option>
+            {genres.map((g) => (
+              <option key={g}>{g}</option>
+            ))}
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <Segmented<View>
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "grid", label: "▦ Grid" },
+              { value: "table", label: "☰ Table" },
+            ]}
+            className="basis-full sm:basis-auto"
+          />
+        </div>
       </div>
 
       {!titles.length ? (
@@ -184,13 +202,15 @@ function Segmented<T extends string>({
   value,
   onChange,
   options,
+  className = "",
 }: {
   value: T;
   onChange(v: T): void;
   options: { value: T; label: string }[];
+  className?: string;
 }) {
   return (
-    <div className="flex flex-1 rounded-lg border border-border bg-surface p-0.5 sm:flex-none">
+    <div className={`flex flex-1 rounded-lg border border-border bg-surface p-0.5 sm:flex-none ${className}`}>
       {options.map((o) => (
         <button
           key={o.value}

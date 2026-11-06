@@ -25,6 +25,8 @@
 
 html {
   color-scheme: dark;
+  /* Pages with and without a scrollbar keep the same width. */
+  scrollbar-gutter: stable;
 }
 
 body {

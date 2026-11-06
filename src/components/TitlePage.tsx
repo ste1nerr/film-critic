@@ -120,6 +120,8 @@ function TitleView({ title: t }: { title: Title }) {
   }
 
   const anime = t.media_type === "anime";
+  // Placeholders hold the space of details that arrive a moment later, so the page doesn't jump.
+  const loadingDetails = !!t.tmdb_id && !details && !detailsError;
   const backdrop = tmdbImage(t.backdrop_path, "original");
   const meta = [
     t.year,
@@ -149,7 +151,11 @@ function TitleView({ title: t }: { title: Title }) {
           <div className="flex min-w-0 flex-1 flex-col gap-6 lg:flex-row lg:items-end">
             <div className="min-w-0 flex-1">
               <h1 className="break-words font-display text-5xl leading-none tracking-wide sm:text-6xl lg:text-7xl">{t.name}</h1>
-              {details?.tagline && <p className="mt-2 italic text-muted">“{details.tagline}”</p>}
+              {details?.tagline ? (
+                <p className="mt-2 italic text-muted">“{details.tagline}”</p>
+              ) : (
+                loadingDetails && <div className="mt-2 h-6 w-2/3 max-w-sm animate-pulse rounded bg-surface-2/70" />
+              )}
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
                 {meta.map((m, i) => (
                   <span key={i}>{m}</span>
@@ -170,6 +176,7 @@ function TitleView({ title: t }: { title: Title }) {
                   <span className="text-foreground">{details.creators.join(", ")}</span>
                 </p>
               )}
+              {loadingDetails && <div className="mt-3 h-5 w-1/2 max-w-xs animate-pulse rounded bg-surface-2/70" />}
             </div>
             <div className="flex shrink-0 items-start gap-5">
               <CrowdScore label="IMDb" value={t.imdb_rating} />
@@ -233,10 +240,16 @@ function TitleView({ title: t }: { title: Title }) {
               </button>
             </p>
           )}
+          {loadingDetails && (
+            <Section title="Trailer">
+              <div className="aspect-video animate-pulse rounded-xl border border-border bg-surface" />
+            </Section>
+          )}
           {detailsError && <p className="text-sm text-rose-300">Couldn’t load details: {detailsError}</p>}
         </div>
 
-        <aside className="min-w-0 space-y-6">
+        {/* On phones the ratings come right after the header instead of below the trailer and cast. */}
+        <aside className="min-w-0 space-y-6 max-lg:order-first">
           <Section title="Your ratings">
             <div className="rounded-2xl border border-border bg-surface p-4">
               {isRated(t) ? (

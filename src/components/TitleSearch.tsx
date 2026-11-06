@@ -80,7 +80,8 @@ export function TitleSearch({
 
       {error && <p className="text-sm text-rose-300">{error}</p>}
 
-      <ul className="space-y-1">
+      {/* Keeps the dialog from resizing on every keystroke while results come and go. */}
+      <ul className={`space-y-1 ${query.trim().length >= 2 ? "min-h-72" : ""}`}>
         {shown.map((r) => (
           <li key={`${r.media_type}-${r.tmdb_id}`}>
             <button
