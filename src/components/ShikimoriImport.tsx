@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { metaOf } from "@/lib/api";
 import { useStore } from "@/lib/store";
-import { NO_RATINGS, type TitleDetails, type TitleInput } from "@/lib/types";
+import { CRITERIA, isRated, NO_RATINGS, type Ratings, type TitleDetails, type TitleInput } from "@/lib/types";
 import { Button, Spinner } from "./ui";
 
 interface Entry {
@@ -16,7 +16,19 @@ interface Entry {
 
 const NICKNAME_KEY = "fc:shikimori";
 
-/** Shikimori's 1–10 score doesn't map onto the five criteria, so it goes into the note instead. */
+const watched = (e: Entry) => (e.status === "completed" || e.status === "rewatching") && e.score > 0;
+
+/**
+ * Spreads a 1–10 score over the five criteria so the overall lands at score / 2:
+ * 8 → 4 4 4 4 4 (4.0), 7 → 4 4 4 3 3 (3.6), 9 → 5 5 5 4 4 (4.6).
+ */
+function ratingsOf(score: number): Ratings {
+  const total = Math.round(score * 2.5);
+  const base = Math.floor(total / CRITERIA.length);
+  const extra = total % CRITERIA.length;
+  return Object.fromEntries(CRITERIA.map((c, i) => [c.key, Math.min(5, Math.max(1, base + (i < extra ? 1 : 0)))])) as Ratings;
+}
+
 function noteOf(e: Entry) {
   const progress = e.episodes ? `, ep ${e.episodes}` : "";
   switch (e.status) {
@@ -49,8 +61,10 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
     } catch {}
   }, []);
 
-  const known = new Set(titles.filter((t) => t.media_type === "anime").map((t) => t.tmdb_id));
+  const known = new Map(titles.filter((t) => t.media_type === "anime").map((t) => [t.tmdb_id, t]));
   const fresh = entries?.filter((e) => !known.has(e.shikimori_id)) ?? [];
+  // Imported earlier without ratings: give them the Shikimori score now.
+  const toRate = entries?.filter((e) => watched(e) && known.get(e.shikimori_id) && !isRated(known.get(e.shikimori_id)!)) ?? [];
 
   async function load() {
     const nick = nickname.trim();
@@ -76,7 +90,10 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
     setBusy(true);
     setError(null);
     try {
-      const rows: TitleInput[] = fresh.map((e) => ({ ...metaOf(e.details), ...NO_RATINGS, note: noteOf(e) }));
+      const rows: (TitleInput & { id?: string })[] = [
+        ...fresh.map((e) => ({ ...metaOf(e.details), ...(watched(e) ? ratingsOf(e.score) : NO_RATINGS), note: noteOf(e) })),
+        ...toRate.map((e) => ({ ...metaOf(e.details), ...ratingsOf(e.score), note: noteOf(e), id: known.get(e.shikimori_id)!.id })),
+      ];
       await importTitles(rows);
       onDone(rows.length);
     } catch (e) {
@@ -85,8 +102,6 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
       setBusy(false);
     }
   }
-
-  const count = (statuses: Entry["status"][]) => fresh.filter((e) => statuses.includes(e.status)).length;
 
   return (
     <div className="space-y-3 rounded-2xl border border-border p-4">
@@ -117,15 +132,16 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
       {entries && (
         <>
           <p className="text-sm text-muted">
-            {entries.length} anime on the list, {entries.length - fresh.length} already here. New: {count(["completed", "rewatching"])} watched,{" "}
-            {count(["watching", "on_hold", "dropped"])} in progress, {count(["planned"])} planned.
+            {entries.length} anime on the list, {entries.length - fresh.length} already here. New: {fresh.filter(watched).length} rated,{" "}
+            {fresh.length - fresh.filter(watched).length} to the watchlist{toRate.length ? `. ${toRate.length} already here get their Shikimori score` : ""}.
           </p>
           <p className="text-sm text-muted">
-            They land on the watchlist with the Shikimori score in the note (“Shikimori: 8/10”). Rate the five criteria when you open them.
+            Your Shikimori score is spread over the five criteria (8/10 → 4 4 4 4 4, 7/10 → 4 4 4 3 3), so the overall is half of it. Adjust any
+            criterion later. Watching and planned anime go to the watchlist.
           </p>
           <div className="flex justify-end">
-            <Button variant="primary" onClick={save} disabled={busy || !fresh.length}>
-              {busy ? "Importing…" : `Import ${fresh.length} anime`}
+            <Button variant="primary" onClick={save} disabled={busy || fresh.length + toRate.length === 0}>
+              {busy ? "Importing…" : `Import ${fresh.length + toRate.length} anime`}
             </Button>
           </div>
         </>
