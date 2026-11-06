@@ -9,7 +9,13 @@ import { Poster, ScoreBadge, Spinner } from "./ui";
 
 type View = "grid" | "table";
 type Shelf = "rated" | "watchlist";
-type TypeFilter = "all" | MediaType;
+
+const TYPES: { value: MediaType; label: string }[] = [
+  { value: "movie", label: "Movies" },
+  { value: "tv", label: "Series" },
+  { value: "anime", label: "Anime" },
+];
+const ALL_TYPES = TYPES.map((t) => t.value).join(",");
 type Sort = "overall-desc" | "overall-asc" | "name" | "year" | "added" | "vs-crowd";
 
 const SORTS: { value: Sort; label: string }[] = [
@@ -60,35 +66,48 @@ function usePersisted<T extends string>(key: string, initial: T) {
   return [value, set] as const;
 }
 
+// Anime without ratings stay on Shikimori's own lists, so they don't fill up the watchlist.
+const onWatchlist = (t: Title) => !isRated(t) && t.media_type !== "anime";
+
 export function Library() {
   const { titles, loading, error } = useStore();
   const [view, setView] = usePersisted<View>("fc:view", "grid");
   const [sort, setSort] = usePersisted<Sort>("fc:sort", "overall-desc");
   const [shelf, setShelf] = usePersisted<Shelf>("fc:shelf", "rated");
-  const [type, setType] = useState<TypeFilter>("all");
+  // Each type is switched on or off on its own, e.g. movies + series without anime.
+  const [typeList, setTypeList] = usePersisted<string>("fc:types", ALL_TYPES);
+  const types = useMemo(() => {
+    const picked = TYPES.map((x) => x.value).filter((x) => typeList.split(",").includes(x));
+    return new Set(picked.length ? picked : TYPES.map((x) => x.value));
+  }, [typeList]);
+  const toggleType = (t: MediaType) => {
+    const next = TYPES.map((x) => x.value).filter((x) => (x === t ? !types.has(x) : types.has(x)));
+    // Switching off the last one would show nothing, so it brings all of them back instead.
+    setTypeList(next.length ? next.join(",") : ALL_TYPES);
+  };
   const [genre, setGenre] = useState("");
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const filtered = type !== "all" || !!genre;
+  const filtered = types.size < TYPES.length || !!genre;
 
   const genres = useMemo(() => [...new Set(titles.flatMap((t) => t.genres))].sort(), [titles]);
   const rated = useMemo(() => titles.filter(isRated), [titles]);
-  const watchCount = titles.length - rated.length;
+  const watchCount = titles.filter(onWatchlist).length;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sortTitles(
       titles.filter(
         (t) =>
-          isRated(t) === (shelf === "rated") &&
-          (type === "all" || t.media_type === type) &&
+          (shelf === "rated" ? isRated(t) : onWatchlist(t)) &&
+          types.has(t.media_type) &&
           (!genre || t.genres.includes(genre)) &&
           (!q || t.name.toLowerCase().includes(q)),
       ),
       // Watchlist titles have no score, so score sorts fall back to most recent.
       shelf === "watchlist" && sort.startsWith("overall") ? "added" : sort,
     );
-  }, [titles, shelf, type, genre, query, sort]);
+  }, [titles, shelf, types, genre, query, sort]);
 
   if (loading && !titles.length) {
     return (
@@ -131,17 +150,23 @@ export function Library() {
           {filtered && <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-accent" />}
         </button>
         <div className={`${filtersOpen ? "flex" : "hidden"} basis-full flex-wrap gap-2 sm:contents`}>
-          <Segmented<TypeFilter>
-            className="basis-full sm:basis-auto"
-            value={type}
-            onChange={setType}
-            options={[
-              { value: "all", label: "All" },
-              { value: "movie", label: "Movies" },
-              { value: "tv", label: "Series" },
-              { value: "anime", label: "Anime" },
-            ]}
-          />
+          <div className="flex basis-full gap-1 rounded-lg border border-border bg-surface p-0.5 sm:basis-auto" role="group" aria-label="Types">
+            {TYPES.map((o) => {
+              const on = types.has(o.value);
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleType(o.value)}
+                  className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition ${on ? "bg-surface-2 text-foreground" : "text-muted line-through decoration-muted/60 hover:text-foreground"}`}
+                >
+                  <span className={`mr-1.5 inline-block w-3 ${on ? "text-accent" : "opacity-0"}`}>✓</span>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
           <select
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
