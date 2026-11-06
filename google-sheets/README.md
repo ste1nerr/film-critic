@@ -1,6 +1,6 @@
 # Google Sheets sync
 
-Two-way sync between the site and one Google spreadsheet with two tabs: `кінокритик` (movies) and `серікритик` (series). Edit a rating in either place and it shows up in the other within a few seconds.
+Two-way sync between the site and one Google spreadsheet with two tabs: `Movies` and `Series`. Edit a rating in either place and it shows up in the other within a few seconds.
 
 ## Setup
 

@@ -4,15 +4,15 @@
  * Sheet → site: an installable onEdit trigger pushes the edited row to Supabase.
  * Site → sheet: a Postgres trigger POSTs every insert/update/delete to doPost (deployed as a web app).
  *
- * Tabs: "кінокритик" holds movies, "серікритик" holds series. One row per title,
+ * Tabs: "Movies" holds movies, "Series" holds series. One row per title,
  * with the database id in a hidden last column. A row with a name and no ratings is
  * on the watchlist; a row with some but not all five ratings isn't saved until it's complete.
  *
  * Setup steps are in google-sheets/README.md.
  */
 
-const MOVIES = 'кінокритик';
-const SERIES = 'серікритик';
+const MOVIES = 'Movies';
+const SERIES = 'Series';
 const TAB_TYPE = { [MOVIES]: 'movie', [SERIES]: 'tv' };
 
 const CRITERIA = ['plot', 'ending', 'acting', 'atmosphere', 'vibe'];
@@ -270,7 +270,7 @@ function migrateOldSheets() {
   }
 
   const seriesRef = PropertiesService.getScriptProperties().getProperty('SERIES_SPREADSHEET_ID');
-  if (!seriesRef) return ui.alert('Додай Script property SERIES_SPREADSHEET_ID: посилання на файл серікритик.');
+  if (!seriesRef) return ui.alert('Додай Script property SERIES_SPREADSHEET_ID: посилання на старий файл із серіалами.');
   const seriesId = (seriesRef.match(/\/d\/([^/]+)/) || [null, seriesRef])[1].trim();
 
   // Leftovers of an earlier run that stopped halfway. MOVIES/SERIES only count as leftovers
