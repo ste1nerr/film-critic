@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { formatScore, scoreTone, tmdbImage } from "@/lib/score";
+import { scoreTone, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
 import { CRITERIA, isRated, TYPE_LABEL, type CriterionKey, type MediaType, type RatedTitle, type Title } from "@/lib/types";
 import { Poster, ScoreBadge, Spinner } from "./ui";
@@ -255,7 +255,6 @@ function Hero({ titles, types }: { titles: RatedTitle[]; types: Set<MediaType> }
   const top = useMemo(() => titles.reduce<RatedTitle | null>((best, t) => (!best || t.overall > best.overall ? t : best), null), [titles]);
   if (!titles.length || !top) return null;
 
-  const avg = titles.reduce((s, t) => s + t.overall, 0) / titles.length;
   const backdrop = tmdbImage(top.backdrop_path, "w1280");
 
   return (
@@ -271,19 +270,19 @@ function Hero({ titles, types }: { titles: RatedTitle[]; types: Set<MediaType> }
       <div className="relative flex flex-col gap-6 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-8">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-widest text-accent">Your top pick</div>
-          <div className="mt-1 break-words font-display text-4xl leading-none tracking-wide sm:text-6xl">{top.name}</div>
+          <div className="mt-1 line-clamp-2 break-words font-display text-4xl leading-none tracking-wide sm:text-6xl">{top.name}</div>
           <div className="mt-2 text-sm text-muted">
             {top.year ?? ""} {top.genres.slice(0, 3).join(" · ")}
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-3 sm:text-right">
+        <div className="flex shrink-0 gap-5 sm:gap-6 sm:text-right">
           <Stat label="Titles" value={String(titles.length)} />
-          {/* A per-type split only says something when more than one type is shown. */}
-          {types.size > 1 &&
-            TYPES.filter((x) => types.has(x.value)).map((x) => (
-              <Stat key={x.value} label={x.label} value={String(titles.filter((t) => t.media_type === x.value).length)} />
-            ))}
-          <Stat label="Avg score" value={formatScore(avg)} />
+          {/* Always all three, dimmed when filtered out, so the banner keeps its size while filters change. */}
+          {TYPES.map((x) => (
+            <div key={x.value} className={types.has(x.value) ? "" : "opacity-35"}>
+              <Stat label={x.label} value={String(titles.filter((t) => t.media_type === x.value).length)} />
+            </div>
+          ))}
         </div>
       </div>
     </Link>
