@@ -127,13 +127,17 @@ function syncRow(sheet, row) {
 }
 
 /**
- * Inserts a new title from a row. `meta` is the TMDB match if the caller already looked it up
- * (null = looked up, nothing found); undefined means look it up here.
+ * Inserts a new title from a row, or links the row to an existing title with the same name and
+ * type. `meta` is the TMDB match if the caller already looked it up (null = looked up, nothing
+ * found); undefined means look it up here.
  */
 function createFromRow(sheet, row, r, meta) {
   const type = TAB_TYPE[sheet.getName()];
   const parts = splitName(r.name);
   const year = r.year || parts.year;
+  let existing = findExisting(type, parts.base, year);
+  if (existing) return linkRow(sheet, row, r, parts, existing);
+
   if (meta === undefined) {
     try {
       meta = findOnTmdb(parts.base, type, year);
@@ -142,18 +146,51 @@ function createFromRow(sheet, row, r, meta) {
       meta = null;
     }
   }
+  // The sheet name may differ from TMDB's ("clan soprano" → "The Sopranos").
+  existing = meta && norm(meta.name) !== norm(parts.base) && findExisting(type, meta.name, meta.year);
+  if (existing) return linkRow(sheet, row, r, parts, existing);
 
   const record = Object.assign(meta || emptyMeta(parts.base, type, year), r.ratings, {
     note: joinNote(parts.extra, r.note),
     user_id: config().USER_ID,
   });
   const created = supabase('post', 'titles', record)[0];
+  if (!created) throw new Error('Supabase не повернув створений запис.');
   remember(created);
   // Ratings stay as typed: the user may already be filling in the next one.
   writeMeta(sheet, row, created);
   sheet.getRange(row, COL.overall).setValue(overallOf(r.ratings));
   mark(sheet, row, meta ? 'ok' : 'notFound', meta ? '' : 'Не знайдено в TMDB, тому без постера. Виправ назву або знайди фільм на сайті (Find it on TMDB).');
   return created;
+}
+
+/**
+ * A title of this user and type with the same name that no other row is linked to yet.
+ * A different known year means a different title (remakes).
+ */
+function findExisting(type, name, year) {
+  const wanted = norm(name);
+  if (!wanted) return null;
+  const records = supabase('get', 'titles?select=*&order=created_at&user_id=eq.' + config().USER_ID + '&media_type=eq.' + type);
+  return records.find((t) => norm(t.name) === wanted && !(year && t.year && t.year !== year) && !locate(t.id)) || null;
+}
+
+/** Links a row without an id to an existing title: pushes the row's ratings and note, then writes the id back. */
+function linkRow(sheet, row, r, parts, existing) {
+  const patch = {};
+  // An empty row means "watchlist", not "clear my ratings".
+  if (r.filled === 5) CRITERIA.forEach((k) => r.ratings[k] !== existing[k] && (patch[k] = r.ratings[k]));
+  const note = joinNote(parts.extra, r.note || existing.note);
+  if (note !== existing.note) patch.note = note;
+
+  const rec = Object.keys(patch).length
+    ? supabase('patch', 'titles?id=eq.' + existing.id + '&user_id=eq.' + config().USER_ID, patch)[0]
+    : existing;
+  if (!rec) throw new Error('Не вдалося оновити наявний запис на сайті.');
+  remember(rec);
+  writeRecord(sheet, row, rec);
+  mark(sheet, row, 'ok');
+  return rec;
 }
 
 function deleteSelectedRows() {
@@ -397,7 +434,8 @@ function linkWithDatabase() {
         done++;
       } else if (x.r.filled === 0 || x.r.filled === 5) {
         try {
-          createFromRow(x.sheet, x.row, x.r, x.meta);
+          // May link to an existing title; it then must not be appended again below.
+          free.delete(createFromRow(x.sheet, x.row, x.r, x.meta).id);
           done++;
         } catch (err) {
           mark(x.sheet, x.row, 'error', String(err.message).slice(0, 500));
