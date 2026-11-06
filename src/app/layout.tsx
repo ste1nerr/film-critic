@@ -23,6 +23,8 @@ const display = Bebas_Neue({
 export const metadata: Metadata = {
   title: "Film Critic",
   description: "Rate movies and series on plot, ending, acting, atmosphere and vibe.",
+  openGraph: { type: "website", siteName: "Film Critic", locale: "en_US" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
