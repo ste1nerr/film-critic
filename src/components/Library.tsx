@@ -92,6 +92,8 @@ export function Library() {
 
   const genres = useMemo(() => [...new Set(titles.flatMap((t) => t.genres))].sort(), [titles]);
   const rated = useMemo(() => titles.filter(isRated), [titles]);
+  // The hero follows the type and genre filters, but not the name search, so it doesn't flicker while typing.
+  const heroTitles = useMemo(() => rated.filter((t) => types.has(t.media_type) && (!genre || t.genres.includes(genre))), [rated, types, genre]);
   const watchCount = titles.filter(onWatchlist).length;
 
   const visible = useMemo(() => {
@@ -119,7 +121,7 @@ export function Library() {
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-6">
-      <Hero titles={rated} />
+      <Hero titles={heroTitles} types={types} />
 
       {error && <p className="mb-4 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
 
@@ -249,12 +251,11 @@ function Segmented<T extends string>({
   );
 }
 
-function Hero({ titles }: { titles: RatedTitle[] }) {
+function Hero({ titles, types }: { titles: RatedTitle[]; types: Set<MediaType> }) {
   const top = useMemo(() => titles.reduce<RatedTitle | null>((best, t) => (!best || t.overall > best.overall ? t : best), null), [titles]);
   if (!titles.length || !top) return null;
 
   const avg = titles.reduce((s, t) => s + t.overall, 0) / titles.length;
-  const series = titles.filter((t) => t.media_type === "tv").length;
   const backdrop = tmdbImage(top.backdrop_path, "w1280");
 
   return (
@@ -275,9 +276,13 @@ function Hero({ titles }: { titles: RatedTitle[] }) {
             {top.year ?? ""} {top.genres.slice(0, 3).join(" · ")}
           </div>
         </div>
-        <div className="flex shrink-0 gap-6 sm:text-right">
+        <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-3 sm:text-right">
           <Stat label="Titles" value={String(titles.length)} />
-          <Stat label="Series" value={String(series)} />
+          {/* A per-type split only says something when more than one type is shown. */}
+          {types.size > 1 &&
+            TYPES.filter((x) => types.has(x.value)).map((x) => (
+              <Stat key={x.value} label={x.label} value={String(titles.filter((t) => t.media_type === x.value).length)} />
+            ))}
           <Stat label="Avg score" value={formatScore(avg)} />
         </div>
       </div>
