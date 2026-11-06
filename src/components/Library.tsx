@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatScore, scoreTone, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import { CRITERIA, isRated, type CriterionKey, type RatedTitle, type Title } from "@/lib/types";
+import { CRITERIA, isRated, TYPE_LABEL, type CriterionKey, type MediaType, type RatedTitle, type Title } from "@/lib/types";
 import { Poster, ScoreBadge, Spinner } from "./ui";
 
 type View = "grid" | "table";
 type Shelf = "rated" | "watchlist";
-type TypeFilter = "all" | "movie" | "tv";
+type TypeFilter = "all" | MediaType;
 type Sort = "overall-desc" | "overall-asc" | "name" | "year" | "added" | "vs-crowd";
 
 const SORTS: { value: Sort; label: string }[] = [
@@ -123,6 +123,7 @@ export function Library() {
             { value: "all", label: "All" },
             { value: "movie", label: "Movies" },
             { value: "tv", label: "Series" },
+            { value: "anime", label: "Anime" },
           ]}
         />
         <select
@@ -280,7 +281,7 @@ function PosterCard({ title: t }: { title: Title }) {
         {t.name}
       </div>
       <div className="text-xs text-muted">
-        {t.year ?? "—"} · {t.media_type === "tv" ? "Series" : "Movie"}
+        {t.year ?? "—"} · {TYPE_LABEL[t.media_type]}
       </div>
     </Link>
   );
@@ -300,7 +301,9 @@ function TitleTable({ titles }: { titles: Title[] }) {
               </th>
             ))}
             <th className="px-3 py-3 text-center font-medium">Overall</th>
-            <th className="px-3 py-3 text-center font-medium">IMDb / TMDB</th>
+            <th className="px-3 py-3 text-center font-medium" title="IMDb / TMDB, or Shikimori for anime">
+              Crowd
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -313,7 +316,7 @@ function TitleTable({ titles }: { titles: Title[] }) {
                   <div className="min-w-0">
                     <div className="truncate font-medium">{t.name}</div>
                     <div className="text-xs text-muted">
-                      {t.year ?? "—"} · {t.media_type === "tv" ? "Series" : "Movie"}
+                      {t.year ?? "—"} · {TYPE_LABEL[t.media_type]}
                     </div>
                   </div>
                 </Link>
@@ -338,7 +341,7 @@ function TitleTable({ titles }: { titles: Title[] }) {
                 </td>
               )}
               <td className="px-3 py-2 text-center tabular-nums text-muted">
-                {t.imdb_rating ?? "—"} / {t.tmdb_rating ?? "—"}
+                {t.media_type === "anime" ? (t.tmdb_rating ?? "—") : `${t.imdb_rating ?? "—"} / ${t.tmdb_rating ?? "—"}`}
               </td>
             </tr>
           ))}

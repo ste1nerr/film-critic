@@ -5,7 +5,7 @@ import { useState } from "react";
 import { emptyMeta, fetchDetails, metaOf } from "@/lib/api";
 import { overallOf } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import { NO_RATINGS, type MediaType, type MaybeRatings, type Ratings, type SearchResult } from "@/lib/types";
+import { NO_RATINGS, TYPE_LABEL, type MediaType, type MaybeRatings, type Ratings, type SearchResult } from "@/lib/types";
 import { RatingEditor } from "./RatingEditor";
 import { TitleSearch } from "./TitleSearch";
 import { Button, Modal, Poster, ScoreBadge } from "./ui";
@@ -63,8 +63,16 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
       {!pick ? (
         <TitleSearch
           onPick={(result) => setPick({ kind: "tmdb", result })}
-          footer={(q) =>
-            q && (
+          footer={(q, source) =>
+            q &&
+            (source === "anime" ? (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-sm text-muted [overflow-wrap:anywhere]">
+                Not on Shikimori?
+                <button className="text-accent hover:underline" onClick={() => setPick({ kind: "manual", name: q, media_type: "anime" })}>
+                  Add “{q}” anyway
+                </button>
+              </div>
+            ) : (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-sm text-muted [overflow-wrap:anywhere]">
                 Not on TMDB? Add “{q}” as
                 <button className="text-accent hover:underline" onClick={() => setPick({ kind: "manual", name: q, media_type: "movie" })}>
@@ -75,7 +83,7 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
                   series
                 </button>
               </div>
-            )
+            ))
           }
         />
       ) : (
@@ -91,7 +99,7 @@ export function AddTitleDialog({ open, onClose }: { open: boolean; onClose(): vo
               <div className="break-words text-lg font-semibold leading-tight">{name}</div>
               {pick.kind === "tmdb" && (
                 <div className="text-sm text-muted">
-                  {pick.result.year ?? "—"} · {pick.result.media_type === "tv" ? "Series" : "Movie"}
+                  {pick.result.year ?? "—"} · {TYPE_LABEL[pick.result.media_type]}
                 </div>
               )}
               <button className="mt-1 text-xs text-accent hover:underline" onClick={() => setPick(null)}>

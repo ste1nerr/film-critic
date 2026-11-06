@@ -29,5 +29,7 @@ export function scoreColor(n: number): string {
 }
 
 export function tmdbImage(path: string | null, size: "w92" | "w185" | "w342" | "w500" | "w780" | "w1280" | "original" = "w342") {
-  return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
+  if (!path) return null;
+  // Anime posters from Shikimori are stored as full URLs.
+  return path.startsWith("http") ? path : `https://image.tmdb.org/t/p/${size}${path}`;
 }

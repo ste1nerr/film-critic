@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDetails, metaOf } from "@/lib/api";
 import { overallOf, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
-import { isRated, type CriterionKey, type Ratings, type Title, type TitleDetails } from "@/lib/types";
+import { isRated, SHIKIMORI_URL, TYPE_LABEL, type CriterionKey, type Ratings, type Title, type TitleDetails } from "@/lib/types";
 import { RadarChart } from "./RadarChart";
 import { RatingEditor } from "./RatingEditor";
 import { TitleSearch } from "./TitleSearch";
@@ -119,12 +119,14 @@ function TitleView({ title: t }: { title: Title }) {
     }
   }
 
+  const anime = t.media_type === "anime";
   const backdrop = tmdbImage(t.backdrop_path, "original");
   const meta = [
     t.year,
-    t.media_type === "tv" ? "Series" : "Movie",
-    t.runtime ? `${t.runtime} min${t.media_type === "tv" ? " / ep" : ""}` : null,
+    TYPE_LABEL[t.media_type],
+    t.runtime ? `${t.runtime} min${t.media_type !== "movie" ? " / ep" : ""}` : null,
     details?.seasons ? `${details.seasons} season${details.seasons > 1 ? "s" : ""}` : null,
+    t.media_type === "anime" && details?.episodes ? `${details.episodes} ep` : null,
   ].filter(Boolean);
 
   return (
@@ -164,14 +166,14 @@ function TitleView({ title: t }: { title: Title }) {
               )}
               {details && details.creators.length > 0 && (
                 <p className="mt-3 text-sm text-muted">
-                  {t.media_type === "tv" ? "Created by" : "Directed by"}{" "}
+                  {{ movie: "Directed by", tv: "Created by", anime: "Studio" }[t.media_type]}{" "}
                   <span className="text-foreground">{details.creators.join(", ")}</span>
                 </p>
               )}
             </div>
             <div className="flex shrink-0 items-start gap-5">
               <CrowdScore label="IMDb" value={t.imdb_rating} />
-              <CrowdScore label="TMDB" value={t.tmdb_rating} />
+              <CrowdScore label={anime ? "Shikimori" : "TMDB"} value={t.tmdb_rating} />
               <div className="flex flex-col items-center">
                 <div className="flex h-16 items-center">
                   {t.overall != null ? (
@@ -225,9 +227,9 @@ function TitleView({ title: t }: { title: Title }) {
 
           {!t.tmdb_id && (
             <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted">
-              Not linked to TMDB, so there’s no poster or description.{" "}
+              Not linked to {anime ? "Shikimori" : "TMDB"}, so there’s no poster or description.{" "}
               <button className="text-accent hover:underline" onClick={() => setRematching(true)}>
-                Find it on TMDB
+                Find it on {anime ? "Shikimori" : "TMDB"}
               </button>
             </p>
           )}
@@ -264,43 +266,42 @@ function TitleView({ title: t }: { title: Title }) {
             </div>
           </Section>
 
-          <div className="flex flex-wrap gap-2">
+          {/* A fixed 2-column grid: wrapping a flex row left Delete hanging on a line of its own. */}
+          <div className="grid grid-cols-2 gap-2">
             {t.tmdb_id && (
               <Button onClick={() => refreshMeta()} disabled={busy}>
                 {busy ? <Spinner /> : "↻"} Refresh info
               </Button>
             )}
-            <Button onClick={() => setRematching(true)}>Change match</Button>
+            <Button onClick={() => setRematching(true)} className={t.tmdb_id ? "" : "col-span-2"}>
+              Change match
+            </Button>
             {t.tmdb_id && (
               <a
-                href={`https://www.themoviedb.org/${t.media_type}/${t.tmdb_id}`}
+                href={anime ? `${SHIKIMORI_URL}/animes/${t.tmdb_id}` : `https://www.themoviedb.org/${t.media_type}/${t.tmdb_id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center rounded-lg border border-border px-3.5 py-2 text-sm text-muted hover:text-foreground"
+                className={`${LINK} ${t.imdb_id ? "" : "col-span-2"}`}
               >
-                TMDB ↗
+                {anime ? "Shikimori" : "TMDB"} ↗
               </a>
             )}
             {t.imdb_id && (
-              <a
-                href={`https://www.imdb.com/title/${t.imdb_id}/`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-lg border border-border px-3.5 py-2 text-sm text-muted hover:text-foreground"
-              >
+              <a href={`https://www.imdb.com/title/${t.imdb_id}/`} target="_blank" rel="noreferrer" className={LINK}>
                 IMDb ↗
               </a>
             )}
-            <Button variant="danger" onClick={remove} className="ml-auto">
+            <Button variant="danger" onClick={remove} className="col-span-2">
               Delete
             </Button>
           </div>
         </aside>
       </div>
 
-      <Modal open={rematching} onClose={() => setRematching(false)} title="Match on TMDB">
+      <Modal open={rematching} onClose={() => setRematching(false)} title="Find a match">
         <TitleSearch
           initialQuery={t.name}
+          initialSource={anime ? "anime" : "tmdb"}
           onPick={(r) => {
             setRematching(false);
             refreshMeta(r.media_type, r.tmdb_id);
@@ -310,6 +311,9 @@ function TitleView({ title: t }: { title: Title }) {
     </div>
   );
 }
+
+const LINK =
+  "inline-flex min-w-0 items-center justify-center rounded-lg border border-border px-3.5 py-2 text-sm text-muted hover:text-foreground";
 
 const DEFAULT_RATINGS: Ratings = { plot: 3, ending: 3, acting: 3, atmosphere: 3, vibe: 3 };
 

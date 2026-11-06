@@ -146,7 +146,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" className="text-foreground hover:underline">
           TMDB
         </a>
-        . This product uses the TMDB API but is not endorsed or certified by TMDB.
+        . This product uses the TMDB API but is not endorsed or certified by TMDB. Anime data from{" "}
+        <a href="https://shikimori.io" target="_blank" rel="noreferrer" className="text-foreground hover:underline">
+          Shikimori
+        </a>
+        .
       </footer>
 
       {user && (

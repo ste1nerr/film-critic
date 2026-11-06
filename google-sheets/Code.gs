@@ -4,7 +4,7 @@
  * Sheet → site: an installable onEdit trigger pushes the edited row to Supabase.
  * Site → sheet: a Postgres trigger POSTs every insert/update/delete to doPost (deployed as a web app).
  *
- * Tabs: "Movies" holds movies, "Series" holds series. One row per title,
+ * Tabs: "Movies" holds movies, "Series" holds series, "Anime" holds anime. One row per title,
  * with the database id in a hidden last column. A row with a name and no ratings is
  * on the watchlist; a row with some but not all five ratings isn't saved until it's complete.
  *
@@ -13,7 +13,8 @@
 
 const MOVIES = 'Movies';
 const SERIES = 'Series';
-const TAB_TYPE = { [MOVIES]: 'movie', [SERIES]: 'tv' };
+const ANIME = 'Anime';
+const TAB_TYPE = { [MOVIES]: 'movie', [SERIES]: 'tv', [ANIME]: 'anime' };
 
 const CRITERIA = ['plot', 'ending', 'acting', 'atmosphere', 'vibe'];
 const COL = { name: 1, plot: 2, ending: 3, acting: 4, atmosphere: 5, vibe: 6, overall: 7, note: 8, year: 9, id: 10 };
@@ -160,7 +161,7 @@ function createFromRow(sheet, row, r, meta) {
   // Ratings stay as typed: the user may already be filling in the next one.
   writeMeta(sheet, row, created);
   sheet.getRange(row, COL.overall).setValue(overallOf(r.ratings));
-  mark(sheet, row, meta ? 'ok' : 'notFound', meta ? '' : 'Не знайдено в TMDB, тому без постера. Виправ назву або знайди фільм на сайті (Find it on TMDB).');
+  mark(sheet, row, meta ? 'ok' : 'notFound', meta ? '' : 'Не знайдено ' + (type === 'anime' ? 'на Shikimori' : 'в TMDB') + ', тому без постера. Виправ назву або знайди на сайті (Find it on…).');
   return created;
 }
 
@@ -196,7 +197,7 @@ function linkRow(sheet, row, r, parts, existing) {
 function deleteSelectedRows() {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (!TAB_TYPE[sheet.getName()]) return ui.alert('Відкрий вкладку «' + MOVIES + '» або «' + SERIES + '».');
+  if (!TAB_TYPE[sheet.getName()]) return ui.alert('Відкрий вкладку «' + MOVIES + '», «' + SERIES + '» або «' + ANIME + '».');
   const range = sheet.getActiveRange();
   const first = Math.max(2, range.getRow());
   const last = range.getLastRow();
@@ -562,12 +563,15 @@ create trigger titles_notify_google_sheet
 
 function tabs() {
   const ss = SpreadsheetApp.getActive();
-  return [MOVIES, SERIES].map((n) => ss.getSheetByName(n)).filter(Boolean);
+  return [MOVIES, SERIES, ANIME].map((n) => ss.getSheetByName(n)).filter(Boolean);
 }
 
 function tabFor(mediaType) {
-  const name = mediaType === 'tv' ? SERIES : MOVIES;
-  const sheet = SpreadsheetApp.getActive().getSheetByName(name);
+  const name = { tv: SERIES, anime: ANIME }[mediaType] || MOVIES;
+  const ss = SpreadsheetApp.getActive();
+  const sheet = ss.getSheetByName(name);
+  // The anime tab came later than the migration, so it's created on first use.
+  if (!sheet && name === ANIME) return createTab(ss, ANIME, 2);
   if (!sheet) throw new Error('Нема вкладки «' + name + '». Запусти «Перенести старі таблиці».');
   return sheet;
 }
@@ -750,11 +754,13 @@ function app(path) {
 }
 
 function findOnTmdb(name, type, year) {
-  const q = year ? name + ' (' + year + ')' : name;
-  const results = app('/api/tmdb/search?q=' + encodeURIComponent(q)).results.filter((r) => r.media_type === type);
+  const anime = type === 'anime';
+  // Anime come from Shikimori, which doesn't understand a "(year)" suffix.
+  const q = year && !anime ? name + ' (' + year + ')' : name;
+  const results = app((anime ? '/api/anime/search?q=' : '/api/tmdb/search?q=') + encodeURIComponent(q)).results.filter((r) => r.media_type === type);
   const hit = (year && results.find((r) => r.year === year)) || results[0];
   if (!hit) return null;
-  const d = app('/api/tmdb/details?type=' + type + '&id=' + hit.tmdb_id);
+  const d = app(anime ? '/api/anime/details?id=' + hit.tmdb_id : '/api/tmdb/details?type=' + type + '&id=' + hit.tmdb_id);
   return {
     tmdb_id: d.tmdb_id,
     media_type: d.media_type,

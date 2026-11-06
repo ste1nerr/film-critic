@@ -1,4 +1,8 @@
-export type MediaType = "movie" | "tv";
+export type MediaType = "movie" | "tv" | "anime";
+
+export const SHIKIMORI_URL = "https://shikimori.io";
+
+export const TYPE_LABEL: Record<MediaType, string> = { movie: "Movie", tv: "Series", anime: "Anime" };
 
 export const CRITERIA = [
   { key: "plot", label: "Plot" },
@@ -13,7 +17,10 @@ export type Ratings = Record<CriterionKey, number>;
 /** All five null = on the watchlist. The database rejects a partial set. */
 export type MaybeRatings = Record<CriterionKey, number | null>;
 
-/** Everything we cache from TMDB/OMDb on a title row. */
+/**
+ * Everything we cache from TMDB/OMDb on a title row. For anime the source is Shikimori:
+ * tmdb_id and tmdb_rating hold its id and score, and image paths are full URLs.
+ */
 export interface TitleMeta {
   tmdb_id: number | null;
   media_type: MediaType;

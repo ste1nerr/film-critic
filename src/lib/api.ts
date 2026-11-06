@@ -7,16 +7,19 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   return data as T;
 }
 
-export async function searchTitles(q: string, signal?: AbortSignal): Promise<SearchResult[]> {
+export type Source = "tmdb" | "anime";
+
+export async function searchTitles(q: string, signal?: AbortSignal, source: Source = "tmdb"): Promise<SearchResult[]> {
   const data = await getJson<{ results: SearchResult[] }>(
-    `/api/tmdb/search?q=${encodeURIComponent(q)}`,
+    `/api/${source}/search?q=${encodeURIComponent(q)}`,
     signal,
   );
   return data.results;
 }
 
 export function fetchDetails(type: MediaType, id: number, signal?: AbortSignal) {
-  return getJson<TitleDetails>(`/api/tmdb/details?type=${type}&id=${id}`, signal);
+  const url = type === "anime" ? `/api/anime/details?id=${id}` : `/api/tmdb/details?type=${type}&id=${id}`;
+  return getJson<TitleDetails>(url, signal);
 }
 
 /** Just the fields cached on a title row. */

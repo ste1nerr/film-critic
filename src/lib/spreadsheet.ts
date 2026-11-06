@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { CRITERIA, type CriterionKey, type MediaType, type Ratings, type Title } from "./types";
+import { CRITERIA, TYPE_LABEL, type CriterionKey, type MediaType, type Ratings, type Title } from "./types";
 
 /** One row read from an imported file, before TMDB matching. */
 export interface ParsedRow {
@@ -32,7 +32,7 @@ const EXPORT_HEADERS = [
 function toRecords(titles: Title[]) {
   return titles.map((t) => [
     t.name,
-    t.media_type === "tv" ? "Series" : "Movie",
+    TYPE_LABEL[t.media_type],
     t.year ?? "",
     t.plot ?? "",
     t.ending ?? "",
@@ -149,7 +149,7 @@ export async function parseRatingsFile(file: File): Promise<{ rows: ParsedRow[];
     rows.push({
       name,
       ratings,
-      media_type: /^(tv|series|show|сериал|серіал)/.test(type) ? "tv" : type ? "movie" : null,
+      media_type: /^(anime|аниме|аніме)/.test(type) ? "anime" : /^(tv|series|show|сериал|серіал)/.test(type) ? "tv" : type ? "movie" : null,
       tmdb_id: Number.isInteger(tmdbId) && tmdbId > 0 ? tmdbId : null,
       note: cols.note !== undefined ? String(line[cols.note] ?? "").trim() || null : null,
     });

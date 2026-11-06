@@ -5,7 +5,8 @@ import { emptyMeta, fetchDetails, mapLimit, metaOf, searchTitles } from "@/lib/a
 import { overallOf } from "@/lib/score";
 import { parseRatingsFile, type ParsedRow } from "@/lib/spreadsheet";
 import { useStore } from "@/lib/store";
-import type { SearchResult, Title, TitleInput } from "@/lib/types";
+import { TYPE_LABEL, type SearchResult, type Title, type TitleInput } from "@/lib/types";
+import { ShikimoriImport } from "./ShikimoriImport";
 import { Button, Modal, Poster, ScoreBadge, Spinner } from "./ui";
 
 interface Candidate {
@@ -57,7 +58,7 @@ export function ImportDialog({ open, onClose }: { open: boolean; onClose(): void
       const candidates = await mapLimit(rows, 4, async (row): Promise<Candidate> => {
         let options: SearchResult[] = [];
         try {
-          options = await searchTitles(row.name);
+          options = await searchTitles(row.name, undefined, row.media_type === "anime" ? "anime" : "tmdb");
           if (row.media_type) {
             // Prefer the type stated in the file, keep the rest as alternatives.
             options.sort((a, b) => Number(b.media_type === row.media_type) - Number(a.media_type === row.media_type));
@@ -139,6 +140,7 @@ export function ImportDialog({ open, onClose }: { open: boolean; onClose(): void
             From Google Sheets: <span className="text-foreground">File → Download → Comma-separated values (.csv)</span>.
             Each title is matched on TMDB automatically, and you can review every match before importing.
           </p>
+          <ShikimoriImport onDone={(count) => setStage({ kind: "done", count })} />
         </div>
       )}
 
@@ -185,7 +187,7 @@ export function ImportDialog({ open, onClose }: { open: boolean; onClose(): void
                     >
                       {c.options.map((o, j) => (
                         <option key={j} value={j}>
-                          {o.name} ({o.year ?? "—"}) · {o.media_type === "tv" ? "Series" : "Movie"}
+                          {o.name} ({o.year ?? "—"}) · {TYPE_LABEL[o.media_type]}
                         </option>
                       ))}
                       <option value={-1}>No TMDB match: keep as plain entry</option>

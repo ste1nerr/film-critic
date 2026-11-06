@@ -4,7 +4,7 @@ create table if not exists public.titles (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name          text not null,
-  media_type    text not null default 'movie' check (media_type in ('movie', 'tv')),
+  media_type    text not null default 'movie' check (media_type in ('movie', 'tv', 'anime')),
 
   -- your ratings, 1–5; all null = on the watchlist, not rated yet
   plot          smallint check (plot between 1 and 5),
