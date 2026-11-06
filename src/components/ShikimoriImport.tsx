@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { metaOf } from "@/lib/api";
 import { useStore } from "@/lib/store";
-import { CRITERIA, isRated, NO_RATINGS, type Ratings, type TitleDetails, type TitleInput } from "@/lib/types";
+import { CRITERIA, isRated, type Ratings, type TitleDetails, type TitleInput } from "@/lib/types";
 import { Button, Spinner } from "./ui";
 
 interface Entry {
@@ -29,23 +29,6 @@ function ratingsOf(score: number): Ratings {
   return Object.fromEntries(CRITERIA.map((c, i) => [c.key, Math.min(5, Math.max(1, base + (i < extra ? 1 : 0)))])) as Ratings;
 }
 
-function noteOf(e: Entry) {
-  const progress = e.episodes ? `, ep ${e.episodes}` : "";
-  switch (e.status) {
-    case "completed":
-    case "rewatching":
-      return e.score ? `Shikimori: ${e.score}/10` : "Shikimori: completed";
-    case "watching":
-      return `Shikimori: watching${progress}`;
-    case "on_hold":
-      return `Shikimori: on hold${progress}`;
-    case "dropped":
-      return `Shikimori: dropped${progress}`;
-    case "planned":
-      return null;
-  }
-}
-
 export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
   const { titles, importTitles } = useStore();
   const [nickname, setNickname] = useState("");
@@ -62,7 +45,8 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
   }, []);
 
   const known = new Map(titles.filter((t) => t.media_type === "anime").map((t) => [t.tmdb_id, t]));
-  const fresh = entries?.filter((e) => !known.has(e.shikimori_id)) ?? [];
+  // Only anime you've watched and scored; the rest stay on Shikimori.
+  const fresh = entries?.filter((e) => watched(e) && !known.has(e.shikimori_id)) ?? [];
   // Imported earlier without ratings: give them the Shikimori score now.
   const toRate = entries?.filter((e) => watched(e) && known.get(e.shikimori_id) && !isRated(known.get(e.shikimori_id)!)) ?? [];
 
@@ -91,8 +75,8 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
     setError(null);
     try {
       const rows: (TitleInput & { id?: string })[] = [
-        ...fresh.map((e) => ({ ...metaOf(e.details), ...(watched(e) ? ratingsOf(e.score) : NO_RATINGS), note: noteOf(e) })),
-        ...toRate.map((e) => ({ ...metaOf(e.details), ...ratingsOf(e.score), note: noteOf(e), id: known.get(e.shikimori_id)!.id })),
+        ...fresh.map((e) => ({ ...metaOf(e.details), ...ratingsOf(e.score), note: `Shikimori: ${e.score}/10` })),
+        ...toRate.map((e) => ({ ...metaOf(e.details), ...ratingsOf(e.score), note: `Shikimori: ${e.score}/10`, id: known.get(e.shikimori_id)!.id })),
       ];
       await importTitles(rows);
       onDone(rows.length);
@@ -132,12 +116,12 @@ export function ShikimoriImport({ onDone }: { onDone(count: number): void }) {
       {entries && (
         <>
           <p className="text-sm text-muted">
-            {entries.length} anime on the list, {entries.length - fresh.length} already here. New: {fresh.filter(watched).length} rated,{" "}
-            {fresh.length - fresh.filter(watched).length} to the watchlist{toRate.length ? `. ${toRate.length} already here get their Shikimori score` : ""}.
+            {entries.filter(watched).length} watched and scored on Shikimori: {fresh.length} new
+            {toRate.length ? `, ${toRate.length} already here get their score` : ""}.
           </p>
           <p className="text-sm text-muted">
             Your Shikimori score is spread over the five criteria (8/10 → 4 4 4 4 4, 7/10 → 4 4 4 3 3), so the overall is half of it. Adjust any
-            criterion later. Watching and planned anime go to the watchlist.
+            criterion later. Watching, planned and unscored anime aren’t imported.
           </p>
           <div className="flex justify-end">
             <Button variant="primary" onClick={save} disabled={busy || fresh.length + toRate.length === 0}>
