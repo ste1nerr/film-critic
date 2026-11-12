@@ -66,8 +66,15 @@ function usePersisted<T extends string>(key: string, initial: T) {
   return [value, set] as const;
 }
 
-// Anime without ratings stay on Shikimori's own lists, so they don't fill up the watchlist.
-const onWatchlist = (t: Title) => !isRated(t) && t.media_type !== "anime";
+/**
+ * Unrated anime that came in bulk from an old Shikimori import stay on Shikimori's own lists, so they don't fill up
+ * the watchlist. A day with more than 10 of them is such an import; anime added by hand or from the bot is shown.
+ */
+function watchlistFilter(titles: Title[]) {
+  const perDay = new Map<string, number>();
+  for (const t of titles) if (!isRated(t) && t.media_type === "anime") perDay.set(t.created_at.slice(0, 10), (perDay.get(t.created_at.slice(0, 10)) ?? 0) + 1);
+  return (t: Title) => !isRated(t) && (t.media_type !== "anime" || (perDay.get(t.created_at.slice(0, 10)) ?? 0) <= 10);
+}
 
 export function Library() {
   const { titles, loading, error } = useStore();
@@ -94,6 +101,7 @@ export function Library() {
   const rated = useMemo(() => titles.filter(isRated), [titles]);
   // The hero follows the type and genre filters, but not the name search, so it doesn't flicker while typing.
   const heroTitles = useMemo(() => rated.filter((t) => types.has(t.media_type) && (!genre || t.genres.includes(genre))), [rated, types, genre]);
+  const onWatchlist = useMemo(() => watchlistFilter(titles), [titles]);
   const watchCount = titles.filter(onWatchlist).length;
 
   const visible = useMemo(() => {
@@ -109,7 +117,7 @@ export function Library() {
       // Watchlist titles have no score, so score sorts fall back to most recent.
       shelf === "watchlist" && sort.startsWith("overall") ? "added" : sort,
     );
-  }, [titles, shelf, types, genre, query, sort]);
+  }, [titles, onWatchlist, shelf, types, genre, query, sort]);
 
   if (loading && !titles.length) {
     return (
