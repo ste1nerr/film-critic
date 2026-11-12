@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store";
 import { isRated, SHIKIMORI_URL, TYPE_LABEL, type CriterionKey, type Ratings, type Title, type TitleDetails } from "@/lib/types";
 import { RadarChart } from "./RadarChart";
 import { RatingEditor } from "./RatingEditor";
+import { SeasonRatings } from "./SeasonRatings";
 import { TitleSearch } from "./TitleSearch";
 import { Button, Modal, Poster, ScoreBadge, Spinner } from "./ui";
 
@@ -278,6 +279,12 @@ function TitleView({ title: t }: { title: Title }) {
               />
             </div>
           </Section>
+
+          {t.media_type === "tv" && details?.seasons && details.seasons > 1 && (
+            <Section title="Seasons">
+              <SeasonRatings titleId={t.id} count={details.seasons} />
+            </Section>
+          )}
 
           {/* A fixed 2-column grid: wrapping a flex row left Delete hanging on a line of its own. */}
           <div className="grid grid-cols-2 gap-2">
