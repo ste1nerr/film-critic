@@ -41,6 +41,8 @@ export interface Title extends TitleMeta, MaybeRatings {
   user_id: string;
   overall: number | null;
   note: string | null;
+  /** Place on the watchlist, lower first; null until the list is first reordered. */
+  watch_rank: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -51,7 +53,7 @@ export const isRated = (t: Title): t is RatedTitle => t.overall != null;
 
 export const NO_RATINGS: MaybeRatings = { plot: null, ending: null, acting: null, atmosphere: null, vibe: null };
 
-export type TitleInput = TitleMeta & MaybeRatings & { note?: string | null };
+export type TitleInput = TitleMeta & MaybeRatings & { note?: string | null; watch_rank?: number | null };
 
 export interface SearchResult {
   tmdb_id: number;

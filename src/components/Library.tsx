@@ -1,7 +1,10 @@
 "use client";
 
+import { closestCenter, DndContext, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { scoreTone, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
 import { CRITERIA, isRated, TYPE_LABEL, type CriterionKey, type MediaType, type RatedTitle, type Title } from "@/lib/types";
@@ -16,9 +19,10 @@ const TYPES: { value: MediaType; label: string }[] = [
   { value: "anime", label: "Anime" },
 ];
 const ALL_TYPES = TYPES.map((t) => t.value).join(",");
-type Sort = "overall-desc" | "overall-asc" | "name" | "year" | "added" | "vs-crowd";
+type Sort = "mine" | "overall-desc" | "overall-asc" | "name" | "year" | "added" | "vs-crowd";
 
-const SORTS: { value: Sort; label: string }[] = [
+const SORTS: { value: Sort; label: string; watchlistOnly?: boolean }[] = [
+  { value: "mine", label: "My order", watchlistOnly: true },
   { value: "overall-desc", label: "Best first" },
   { value: "overall-asc", label: "Worst first" },
   { value: "added", label: "Recently added" },
@@ -37,6 +41,8 @@ function sortTitles(list: Title[], sort: Sort) {
   const copy = list.slice();
   const score = (t: Title) => t.overall ?? 0;
   const by = {
+    // Unranked (just added) titles go on top, newest first.
+    mine: (a: Title, b: Title) => (a.watch_rank ?? -Infinity) - (b.watch_rank ?? -Infinity) || b.created_at.localeCompare(a.created_at),
     "overall-desc": (a: Title, b: Title) => score(b) - score(a) || a.name.localeCompare(b.name),
     "overall-asc": (a: Title, b: Title) => score(a) - score(b) || a.name.localeCompare(b.name),
     name: (a: Title, b: Title) => a.name.localeCompare(b.name),
@@ -76,8 +82,62 @@ function watchlistFilter(titles: Title[]) {
   return (t: Title) => !isRated(t) && (t.media_type !== "anime" || (perDay.get(t.created_at.slice(0, 10)) ?? 0) <= 10);
 }
 
+/**
+ * Moves one title next to another within the whole watchlist (filters may hide some of it).
+ * Once every title has a rank only the moved one changes; before that the whole list is numbered once.
+ */
+function reorder(list: Title[], activeId: string, overId: string): { id: string; rank: number }[] {
+  const from = list.findIndex((t) => t.id === activeId);
+  const to = list.findIndex((t) => t.id === overId);
+  if (from < 0 || to < 0 || from === to) return [];
+  const next = arrayMove(list, from, to);
+  if (list.some((t) => t.watch_rank == null)) {
+    return next.flatMap((t, i) => (t.watch_rank === i + 1 ? [] : [{ id: t.id, rank: i + 1 }]));
+  }
+  const prev = next[to - 1]?.watch_rank;
+  const after = next[to + 1]?.watch_rank;
+  const rank = prev == null ? after! - 1 : after == null ? prev + 1 : (prev + after) / 2;
+  return [{ id: activeId, rank }];
+}
+
+type Handle = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">;
+
+/** Set inside the drag-to-reorder list, so the card shows its handle. */
+const DragHandleProps = createContext<Handle | null>(null);
+
+function Sortable({ id, children, as: Tag = "div" }: { id: string; children: ReactNode; as?: "div" | "tr" }) {
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const handle = useMemo(() => ({ attributes, listeners, setActivatorNodeRef }), [attributes, listeners, setActivatorNodeRef]);
+  return (
+    <DragHandleProps.Provider value={handle}>
+      <Tag ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} className={isDragging ? "group relative z-20 opacity-80" : "group"}>
+        {children}
+      </Tag>
+    </DragHandleProps.Provider>
+  );
+}
+
+function DragHandle({ className = "" }: { className?: string }) {
+  const handle = useContext(DragHandleProps);
+  if (!handle) return null;
+  const { attributes, listeners, setActivatorNodeRef } = handle;
+  return (
+    <button
+      type="button"
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+      aria-label="Drag to reorder"
+      // Without touch-action the phone scrolls the page instead of dragging.
+      className={`grid size-8 cursor-grab touch-none place-items-center rounded-lg active:cursor-grabbing ${className}`}
+    >
+      ⠿
+    </button>
+  );
+}
+
 export function Library() {
-  const { titles, loading, error } = useStore();
+  const { titles, loading, error, updateTitle } = useStore();
   const [view, setView] = usePersisted<View>("fc:view", "grid");
   const [sort, setSort] = usePersisted<Sort>("fc:sort", "overall-desc");
   const [shelf, setShelf] = usePersisted<Shelf>("fc:shelf", "rated");
@@ -104,6 +164,22 @@ export function Library() {
   const onWatchlist = useMemo(() => watchlistFilter(titles), [titles]);
   const watchCount = titles.filter(onWatchlist).length;
 
+  // Score sorts mean nothing on the watchlist, and "My order" means nothing on the rated shelf.
+  const shownSort: Sort = shelf === "watchlist" ? (sort.startsWith("overall") ? "added" : sort) : sort === "mine" ? "overall-desc" : sort;
+  const dragging = shelf === "watchlist" && shownSort === "mine";
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    const watchlist = sortTitles(titles.filter(onWatchlist), "mine");
+    for (const r of reorder(watchlist, String(active.id), String(over.id))) {
+      updateTitle(r.id, { watch_rank: r.rank }).catch((e) => alert(e.message));
+    }
+  };
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sortTitles(
@@ -114,10 +190,9 @@ export function Library() {
           (!genre || t.genres.includes(genre)) &&
           (!q || t.name.toLowerCase().includes(q)),
       ),
-      // Watchlist titles have no score, so score sorts fall back to most recent.
-      shelf === "watchlist" && sort.startsWith("overall") ? "added" : sort,
+      shownSort,
     );
-  }, [titles, onWatchlist, shelf, types, genre, query, sort]);
+  }, [titles, onWatchlist, shelf, types, genre, query, shownSort]);
 
   if (loading && !titles.length) {
     return (
@@ -188,11 +263,11 @@ export function Library() {
             ))}
           </select>
           <select
-            value={sort}
+            value={shownSort}
             onChange={(e) => setSort(e.target.value as Sort)}
             className="min-w-0 flex-1 basis-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-none sm:basis-auto"
           >
-            {SORTS.map((s) => (
+            {SORTS.filter((s) => (shelf === "watchlist" ? !s.value.startsWith("overall") : !s.watchlistOnly)).map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
@@ -220,14 +295,26 @@ export function Library() {
               ? "Nothing rated yet."
               : "Nothing matches these filters."}
         </p>
-      ) : view === "grid" ? (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {visible.map((t) => (
-            <PosterCard key={t.id} title={t} />
-          ))}
-        </div>
       ) : (
-        <TitleTable titles={visible} />
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={dragging ? visible.map((t) => t.id) : []} strategy={view === "grid" ? rectSortingStrategy : verticalListSortingStrategy}>
+            {view === "grid" ? (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                {visible.map((t) =>
+                  dragging ? (
+                    <Sortable key={t.id} id={t.id}>
+                      <PosterCard title={t} />
+                    </Sortable>
+                  ) : (
+                    <PosterCard key={t.id} title={t} />
+                  ),
+                )}
+              </div>
+            ) : (
+              <TitleTable titles={visible} sortable={dragging} />
+            )}
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
@@ -311,6 +398,10 @@ function PosterCard({ title: t }: { title: Title }) {
     <Link href={`/title/${t.id}`} className="group block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/40 transition duration-300 group-hover:-translate-y-1 group-hover:border-accent/60">
         <Poster path={t.poster_path} alt={t.name} className="size-full" />
+        {/* Inside the link, so a tap on the handle must not open the title. */}
+        <div className="absolute left-2 top-2" onClick={(e) => e.preventDefault()}>
+          <DragHandle className="bg-black/60 text-white/90 backdrop-blur" />
+        </div>
         {isRated(t) ? (
           <>
             <div className="absolute right-2 top-2">
@@ -344,7 +435,7 @@ function PosterCard({ title: t }: { title: Title }) {
   );
 }
 
-function TitleTable({ titles }: { titles: Title[] }) {
+function TitleTable({ titles, sortable }: { titles: Title[]; sortable: boolean }) {
   const { updateTitle } = useStore();
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
@@ -364,10 +455,13 @@ function TitleTable({ titles }: { titles: Title[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {titles.map((t) => (
-            <tr key={t.id} className="group hover:bg-surface/60">
+          {titles.map((t) => {
+            const cells = (
+              <>
               {/* Title stays pinned while the ratings scroll sideways on narrow screens. */}
               <td className="sticky left-0 z-10 bg-background px-3 py-2 group-hover:bg-surface">
+                <div className="flex items-center gap-2">
+                <DragHandle className="shrink-0 bg-surface-2 text-muted" />
                 <Link href={`/title/${t.id}`} className="flex max-w-40 items-center gap-3 hover:text-accent sm:max-w-64">
                   <Poster path={t.poster_path} alt="" size="w92" className="h-12 w-8 shrink-0 rounded text-[0px]" />
                   <div className="min-w-0">
@@ -377,6 +471,7 @@ function TitleTable({ titles }: { titles: Title[] }) {
                     </div>
                   </div>
                 </Link>
+                </div>
               </td>
               {isRated(t) ? (
                 <>
@@ -400,8 +495,18 @@ function TitleTable({ titles }: { titles: Title[] }) {
               <td className="px-3 py-2 text-center tabular-nums text-muted">
                 {t.media_type === "anime" ? (t.tmdb_rating ?? "—") : `${t.imdb_rating ?? "—"} / ${t.tmdb_rating ?? "—"}`}
               </td>
-            </tr>
-          ))}
+              </>
+            );
+            return sortable ? (
+              <Sortable key={t.id} id={t.id} as="tr">
+                {cells}
+              </Sortable>
+            ) : (
+              <tr key={t.id} className="group hover:bg-surface/60">
+                {cells}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
