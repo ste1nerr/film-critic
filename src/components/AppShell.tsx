@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { AddTitleDialog } from "./AddTitleDialog";
 import { AuthScreen, SetupScreen } from "./AuthScreen";
 import { ImportDialog } from "./ImportDialog";
+import { ShareDialog } from "./ShareDialog";
 import { Button, Spinner } from "./ui";
 
 function Logo() {
@@ -80,6 +81,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, authReady, signOut } = useStore();
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  // Share links open without signing in.
+  const isShared = usePathname().startsWith("/s/");
 
   let body: React.ReactNode;
   if (!supabase) body = <SetupScreen />;
@@ -89,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Spinner className="size-8 text-accent" />
       </div>
     );
-  else if (!user) body = <AuthScreen />;
+  else if (!user && !isShared) body = <AuthScreen />;
   else body = children;
 
   return (
@@ -104,6 +108,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <NavLink href="/stats">Stats</NavLink>
               </nav>
               <div className="ml-auto flex items-center gap-2">
+                <Button onClick={() => setSharing(true)} className="hidden sm:inline-flex">
+                  Share
+                </Button>
                 <Button onClick={() => setImporting(true)} className="hidden sm:inline-flex">
                   Import
                 </Button>
@@ -129,8 +136,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/">Library</NavLink>
             <NavLink href="/stats">Stats</NavLink>
             <button
-              onClick={() => setImporting(true)}
+              onClick={() => setSharing(true)}
               className="ml-auto rounded-lg px-3 py-1.5 text-sm text-muted hover:text-foreground"
+            >
+              Share
+            </button>
+            <button
+              onClick={() => setImporting(true)}
+              className=" rounded-lg px-3 py-1.5 text-sm text-muted hover:text-foreground"
             >
               Import
             </button>
@@ -157,6 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <>
           <AddTitleDialog open={adding} onClose={() => setAdding(false)} />
           <ImportDialog open={importing} onClose={() => setImporting(false)} />
+          <ShareDialog open={sharing} onClose={() => setSharing(false)} />
         </>
       )}
     </>

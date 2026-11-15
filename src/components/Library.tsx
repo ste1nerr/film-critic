@@ -102,6 +102,19 @@ function reorder(list: Title[], activeId: string, overId: string): { id: string;
 
 type Handle = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">;
 
+/** True on a shared (read-only) library: no editing, no title pages. */
+const ReadOnly = createContext(false);
+
+/** A link to the title page, or a plain block on a shared library, where title pages aren't open. */
+function TitleLink({ id, className, children }: { id: string; className?: string; children: ReactNode }) {
+  if (useContext(ReadOnly)) return <div className={className}>{children}</div>;
+  return (
+    <Link href={`/title/${id}`} className={className}>
+      {children}
+    </Link>
+  );
+}
+
 /** Set inside the drag-to-reorder list, so the card shows its handle. */
 const DragHandleProps = createContext<Handle | null>(null);
 
@@ -136,8 +149,13 @@ function DragHandle({ className = "" }: { className?: string }) {
   );
 }
 
-export function Library() {
-  const { titles, loading, error, updateTitle } = useStore();
+/** With `shared`, shows someone else's titles read-only instead of the signed-in user's library. */
+export function Library({ shared }: { shared?: Title[] }) {
+  const store = useStore();
+  const titles = shared ?? store.titles;
+  const loading = !shared && store.loading;
+  const error = shared ? null : store.error;
+  const { updateTitle } = store;
   const [view, setView] = usePersisted<View>("fc:view", "grid");
   const [sort, setSort] = usePersisted<Sort>("fc:sort", "overall-desc");
   const [shelf, setShelf] = usePersisted<Shelf>("fc:shelf", "rated");
@@ -166,7 +184,7 @@ export function Library() {
 
   // Score sorts mean nothing on the watchlist, and "My order" means nothing on the rated shelf.
   const shownSort: Sort = shelf === "watchlist" ? (sort.startsWith("overall") ? "added" : sort) : sort === "mine" ? "overall-desc" : sort;
-  const dragging = shelf === "watchlist" && shownSort === "mine";
+  const dragging = !shared && shelf === "watchlist" && shownSort === "mine";
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
@@ -203,6 +221,7 @@ export function Library() {
   }
 
   return (
+    <ReadOnly.Provider value={!!shared}>
     <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-6">
       <Hero titles={heroTitles} types={types} />
 
@@ -286,11 +305,13 @@ export function Library() {
       </div>
 
       {!titles.length ? (
-        <Empty />
+        shared ? <p className="py-16 text-center text-muted">This library is empty.</p> : <Empty />
       ) : !visible.length ? (
         <p className="py-16 text-center text-muted">
           {shelf === "watchlist" && !watchCount
-            ? "Your watchlist is empty. Add a title and choose “Want to watch”."
+            ? shared
+              ? "The watchlist is empty."
+              : "Your watchlist is empty. Add a title and choose “Want to watch”."
             : shelf === "rated" && !rated.length
               ? "Nothing rated yet."
               : "Nothing matches these filters."}
@@ -317,6 +338,7 @@ export function Library() {
         </DndContext>
       )}
     </div>
+    </ReadOnly.Provider>
   );
 }
 
@@ -347,16 +369,14 @@ function Segmented<T extends string>({
 }
 
 function Hero({ titles, types }: { titles: RatedTitle[]; types: Set<MediaType> }) {
+  const readOnly = useContext(ReadOnly);
   const top = useMemo(() => titles.reduce<RatedTitle | null>((best, t) => (!best || t.overall > best.overall ? t : best), null), [titles]);
   if (!titles.length || !top) return null;
 
   const backdrop = tmdbImage(top.backdrop_path, "w1280");
 
   return (
-    <Link
-      href={`/title/${top.id}`}
-      className="group relative mb-6 block overflow-hidden rounded-2xl border border-border bg-surface"
-    >
+    <TitleLink id={top.id} className="group relative mb-6 block overflow-hidden rounded-2xl border border-border bg-surface">
       {backdrop && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={backdrop} alt="" className="absolute inset-0 size-full object-cover opacity-40 transition duration-700 group-hover:scale-105" />
@@ -364,7 +384,7 @@ function Hero({ titles, types }: { titles: RatedTitle[]; types: Set<MediaType> }
       <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
       <div className="relative flex flex-col gap-6 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-8">
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-widest text-accent">Your top pick</div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-accent">{readOnly ? "Top pick" : "Your top pick"}</div>
           <div className="mt-1 line-clamp-2 break-words font-display text-4xl leading-none tracking-wide sm:text-6xl">{top.name}</div>
           <div className="mt-2 text-sm text-muted">
             {top.year ?? ""} {top.genres.slice(0, 3).join(" · ")}
@@ -380,7 +400,7 @@ function Hero({ titles, types }: { titles: RatedTitle[]; types: Set<MediaType> }
           ))}
         </div>
       </div>
-    </Link>
+    </TitleLink>
   );
 }
 
@@ -394,8 +414,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function PosterCard({ title: t }: { title: Title }) {
+  const readOnly = useContext(ReadOnly);
   return (
-    <Link href={`/title/${t.id}`} className="group block">
+    <TitleLink id={t.id} className="group block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/40 transition duration-300 group-hover:-translate-y-1 group-hover:border-accent/60">
         <Poster path={t.poster_path} alt={t.name} className="size-full" />
         {/* Inside the link, so a tap on the handle must not open the title. */}
@@ -419,7 +440,7 @@ function PosterCard({ title: t }: { title: Title }) {
               ))}
             </div>
           </>
-        ) : (
+        ) : readOnly ? null : (
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black via-black/90 to-transparent p-3 pt-8 text-center text-xs font-medium text-white transition duration-300 group-hover:translate-y-0">
             Rate it →
           </div>
@@ -431,12 +452,13 @@ function PosterCard({ title: t }: { title: Title }) {
       <div className="text-xs text-muted">
         {t.year ?? "—"} · {TYPE_LABEL[t.media_type]}
       </div>
-    </Link>
+    </TitleLink>
   );
 }
 
 function TitleTable({ titles, sortable }: { titles: Title[]; sortable: boolean }) {
   const { updateTitle } = useStore();
+  const readOnly = useContext(ReadOnly);
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <table className="w-full min-w-[760px] text-sm">
@@ -462,7 +484,7 @@ function TitleTable({ titles, sortable }: { titles: Title[]; sortable: boolean }
               <td className="sticky left-0 z-10 bg-background px-3 py-2 group-hover:bg-surface">
                 <div className="flex items-center gap-2">
                 <DragHandle className="shrink-0 bg-surface-2 text-muted" />
-                <Link href={`/title/${t.id}`} className="flex max-w-40 items-center gap-3 hover:text-accent sm:max-w-64">
+                <TitleLink id={t.id} className="flex max-w-40 items-center gap-3 hover:text-accent sm:max-w-64">
                   <Poster path={t.poster_path} alt="" size="w92" className="h-12 w-8 shrink-0 rounded text-[0px]" />
                   <div className="min-w-0">
                     <div className="truncate font-medium">{t.name}</div>
@@ -470,14 +492,18 @@ function TitleTable({ titles, sortable }: { titles: Title[]; sortable: boolean }
                       {t.year ?? "—"} · {TYPE_LABEL[t.media_type]}
                     </div>
                   </div>
-                </Link>
+                </TitleLink>
                 </div>
               </td>
               {isRated(t) ? (
                 <>
                   {CRITERIA.map((c) => (
                     <td key={c.key} className="px-2 py-2 text-center">
+                      {readOnly ? (
+                        <span className={`inline-block rounded-md px-2.5 py-1 font-semibold tabular-nums ${scoreTone(t[c.key])}`}>{t[c.key]}</span>
+                      ) : (
                       <RatingCell value={t[c.key]} onChange={(n) => updateTitle(t.id, { [c.key]: n } as Record<CriterionKey, number>).catch((e) => alert(e.message))} label={`${t.name} ${c.label}`} />
+                      )}
                     </td>
                   ))}
                   <td className="px-3 py-2 text-center">
@@ -487,9 +513,13 @@ function TitleTable({ titles, sortable }: { titles: Title[]; sortable: boolean }
               ) : (
                 // All five are set at once on the title page; a partial set isn't allowed.
                 <td colSpan={CRITERIA.length + 1} className="px-3 py-2 text-center">
-                  <Link href={`/title/${t.id}`} className="text-accent hover:underline">
-                    Rate it →
-                  </Link>
+                  {readOnly ? (
+                    <span className="text-muted">Want to watch</span>
+                  ) : (
+                    <Link href={`/title/${t.id}`} className="text-accent hover:underline">
+                      Rate it →
+                    </Link>
+                  )}
                 </td>
               )}
               <td className="px-3 py-2 text-center tabular-nums text-muted">
