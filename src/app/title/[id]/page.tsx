@@ -1,6 +1,11 @@
+import { PageTransition } from "@/components/motion";
 import { TitlePage } from "@/components/TitlePage";
 
 export default async function Page({ params }: PageProps<"/title/[id]">) {
   const { id } = await params;
-  return <TitlePage id={id} />;
+  return (
+    <PageTransition>
+      <TitlePage id={id} />
+    </PageTransition>
+  );
 }

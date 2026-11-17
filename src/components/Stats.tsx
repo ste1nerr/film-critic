@@ -6,6 +6,7 @@ import { formatScore } from "@/lib/score";
 import { useStore } from "@/lib/store";
 import { CRITERIA, isRated, type RatedTitle } from "@/lib/types";
 import { crowdGap } from "./Library";
+import { FORWARD } from "./motion";
 import { Poster, ScoreBadge } from "./ui";
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -75,7 +76,7 @@ export function Stats() {
           <ol className="space-y-2">
             {data.top.map((t, i) => (
               <li key={t.id}>
-                <Link href={`/title/${t.id}`} className="flex items-center gap-3 rounded-lg p-1 hover:bg-surface-2">
+                <Link href={`/title/${t.id}`} transitionTypes={FORWARD} className="flex items-center gap-3 rounded-lg p-1 hover:bg-surface-2">
                   <span className="w-6 shrink-0 text-right font-display text-xl text-muted">{i + 1}</span>
                   <Poster path={t.poster_path} alt="" size="w92" className="h-10 w-7 shrink-0 rounded text-[0px]" />
                   <span className="min-w-0 flex-1 truncate text-sm">{t.name}</span>
@@ -165,7 +166,7 @@ function GapList({ items }: { items: { t: RatedTitle; gap: number }[] }) {
     <ul className="space-y-2">
       {items.map(({ t, gap }) => (
         <li key={t.id}>
-          <Link href={`/title/${t.id}`} className="flex items-center gap-3 rounded-lg p-1 text-sm hover:bg-surface-2">
+          <Link href={`/title/${t.id}`} transitionTypes={FORWARD} className="flex items-center gap-3 rounded-lg p-1 text-sm hover:bg-surface-2">
             <Poster path={t.poster_path} alt="" size="w92" className="h-10 w-7 shrink-0 rounded text-[0px]" />
             <span className="min-w-0 flex-1 truncate">{t.name}</span>
             <span className="hidden shrink-0 tabular-nums text-muted min-[400px]:inline">

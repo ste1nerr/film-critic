@@ -8,7 +8,9 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { scoreTone, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
 import { CRITERIA, isRated, TYPE_LABEL, type CriterionKey, type MediaType, type RatedTitle, type Title } from "@/lib/types";
-import { Poster, ScoreBadge, Spinner } from "./ui";
+import { FORWARD } from "./motion";
+import { LibrarySkeleton } from "./skeletons";
+import { Poster, ScoreBadge } from "./ui";
 
 type View = "grid" | "table";
 type Shelf = "rated" | "watchlist";
@@ -109,7 +111,7 @@ const ReadOnly = createContext(false);
 function TitleLink({ id, className, children }: { id: string; className?: string; children: ReactNode }) {
   if (useContext(ReadOnly)) return <div className={className}>{children}</div>;
   return (
-    <Link href={`/title/${id}`} className={className}>
+    <Link href={`/title/${id}`} transitionTypes={FORWARD} className={className}>
       {children}
     </Link>
   );
@@ -212,13 +214,7 @@ export function Library({ shared }: { shared?: Title[] }) {
     );
   }, [titles, onWatchlist, shelf, types, genre, query, shownSort]);
 
-  if (loading && !titles.length) {
-    return (
-      <div className="grid flex-1 place-items-center">
-        <Spinner className="size-8 text-accent" />
-      </div>
-    );
-  }
+  if (loading && !titles.length) return <LibrarySkeleton />;
 
   return (
     <ReadOnly.Provider value={!!shared}>
@@ -320,7 +316,7 @@ export function Library({ shared }: { shared?: Title[] }) {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={dragging ? visible.map((t) => t.id) : []} strategy={view === "grid" ? rectSortingStrategy : verticalListSortingStrategy}>
             {view === "grid" ? (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              <div className={`grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 ${dragging ? "" : "rise-in"}`}>
                 {visible.map((t) =>
                   dragging ? (
                     <Sortable key={t.id} id={t.id}>
@@ -416,7 +412,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function PosterCard({ title: t }: { title: Title }) {
   const readOnly = useContext(ReadOnly);
   return (
-    <TitleLink id={t.id} className="group block">
+    <TitleLink id={t.id} className="lift group block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/40 transition duration-300 group-hover:-translate-y-1 group-hover:border-accent/60">
         <Poster path={t.poster_path} alt={t.name} className="size-full" />
         {/* Inside the link, so a tap on the handle must not open the title. */}
@@ -516,7 +512,7 @@ function TitleTable({ titles, sortable }: { titles: Title[]; sortable: boolean }
                   {readOnly ? (
                     <span className="text-muted">Want to watch</span>
                   ) : (
-                    <Link href={`/title/${t.id}`} className="text-accent hover:underline">
+                    <Link href={`/title/${t.id}`} transitionTypes={FORWARD} className="text-accent hover:underline">
                       Rate it →
                     </Link>
                   )}

@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
+import { Delight } from "@/components/Delight";
 import { StoreProvider } from "@/lib/store";
 import "./globals.css";
 
@@ -27,6 +28,8 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
+export const viewport: Viewport = { themeColor: "#0b0b10", colorScheme: "dark" };
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -36,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col font-sans">
         <StoreProvider>
           <AppShell>{children}</AppShell>
+          <Delight />
         </StoreProvider>
       </body>
     </html>

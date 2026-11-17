@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { exportCsv, exportXlsx } from "@/lib/spreadsheet";
 import { useStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -10,11 +10,14 @@ import { AddTitleDialog } from "./AddTitleDialog";
 import { AuthScreen, SetupScreen } from "./AuthScreen";
 import { ImportDialog } from "./ImportDialog";
 import { ShareDialog } from "./ShareDialog";
-import { Button, Spinner } from "./ui";
+import { ADD_EVENT } from "./Delight";
+import { BACK } from "./motion";
+import { LibrarySkeleton } from "./skeletons";
+import { Button } from "./ui";
 
 function Logo() {
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2">
+    <Link href="/" transitionTypes={BACK} className="flex shrink-0 items-center gap-2">
       <span className="grid size-8 place-items-center rounded-lg bg-accent text-black">🎬</span>
       <span className="whitespace-nowrap font-display text-2xl tracking-wider">Film Critic</span>
     </Link>
@@ -85,14 +88,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Share links open without signing in.
   const isShared = usePathname().startsWith("/s/");
 
+  useEffect(() => {
+    if (!user) return;
+    const open = () => setAdding(true);
+    addEventListener(ADD_EVENT, open);
+    return () => removeEventListener(ADD_EVENT, open);
+  }, [user]);
+
   let body: React.ReactNode;
   if (!supabase) body = <SetupScreen />;
   else if (!authReady)
-    body = (
-      <div className="grid flex-1 place-items-center">
-        <Spinner className="size-8 text-accent" />
-      </div>
-    );
+    body = <LibrarySkeleton />;
   else if (!user && !isShared) body = <AuthScreen />;
   else body = children;
 

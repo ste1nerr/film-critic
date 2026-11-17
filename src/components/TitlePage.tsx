@@ -7,6 +7,7 @@ import { fetchDetails, metaOf } from "@/lib/api";
 import { overallOf, tmdbImage } from "@/lib/score";
 import { useStore } from "@/lib/store";
 import { isRated, SHIKIMORI_URL, TYPE_LABEL, type CriterionKey, type Ratings, type Title, type TitleDetails } from "@/lib/types";
+import { BACK } from "./motion";
 import { RadarChart } from "./RadarChart";
 import { RatingEditor } from "./RatingEditor";
 import { SeasonRatings } from "./SeasonRatings";
@@ -25,7 +26,7 @@ export function TitlePage({ id }: { id: string }) {
     ) : (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20">
         <p className="text-muted">This title isn’t in your library.</p>
-        <Link href="/" className="text-accent hover:underline">
+        <Link href="/" transitionTypes={BACK} className="text-accent hover:underline">
           Back to library
         </Link>
       </div>
