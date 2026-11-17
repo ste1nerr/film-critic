@@ -1,8 +1,8 @@
--- Run once in Supabase → SQL Editor. Optional per-season scores for series; the title's own rating is not affected.
+-- Run once in Supabase → SQL Editor. Per-season "watched" marks with an optional score; the title's own rating is not affected.
 create table if not exists public.title_seasons (
   title_id   uuid not null references public.titles (id) on delete cascade,
   season     smallint not null check (season > 0),
-  rating     smallint not null check (rating between 1 and 5),
+  rating     smallint check (rating between 1 and 5), -- null = watched, not rated
   user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
   updated_at timestamptz not null default now(),
   primary key (title_id, season)
