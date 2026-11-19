@@ -1,13 +1,13 @@
 "use client";
 
 import { scoreTone } from "@/lib/score";
-import { CRITERIA, type CriterionKey, type Ratings } from "@/lib/types";
+import { CRITERIA, type CriterionKey, type MaybeRatings } from "@/lib/types";
 
 export function RatingEditor({
   value,
   onChange,
 }: {
-  value: Ratings;
+  value: MaybeRatings;
   onChange(key: CriterionKey, rating: number): void;
 }) {
   return (
