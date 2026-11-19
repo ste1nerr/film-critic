@@ -38,7 +38,7 @@ export function TitlePage({ id }: { id: string }) {
 }
 
 function TitleView({ title: t }: { title: Title }) {
-  const { updateTitle, removeTitle } = useStore();
+  const { updateTitle, removeTitle, setSeasonsOverall } = useStore();
   const router = useRouter();
   const [details, setDetails] = useState<TitleDetails | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
@@ -48,6 +48,7 @@ function TitleView({ title: t }: { title: Title }) {
   const draftNote = useRef(note);
   const pendingNote = useRef(0);
   const [rematching, setRematching] = useState(false);
+  const onSeasonsAverage = useCallback((avg: number | null) => setSeasonsOverall(t.id, avg), [setSeasonsOverall, t.id]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -191,7 +192,7 @@ function TitleView({ title: t }: { title: Title }) {
                     <span className="rounded-2xl border border-border bg-surface/70 px-3 py-2 text-sm text-muted">Watchlist</span>
                   )}
                 </div>
-                <div className="mt-1 text-xs uppercase tracking-wider text-muted">You</div>
+                <div className="mt-1 text-xs uppercase tracking-wider text-muted">{t.overall != null && t.seasons_overall != null ? "You · seasons" : "You"}</div>
               </div>
             </div>
           </div>
@@ -263,6 +264,9 @@ function TitleView({ title: t }: { title: Title }) {
                     value={t}
                     onChange={(k: CriterionKey, n) => updateTitle(t.id, { [k]: n } as Partial<Title>).catch(fail)}
                   />
+                  {t.seasons_overall != null && (
+                    <p className="mt-2 text-xs text-muted">The overall is the average of your season scores. Clear those to go back to these criteria.</p>
+                  )}
                 </>
               ) : (
                 <FirstRating onSave={(r) => updateTitle(t.id, r).catch(fail)} />
@@ -283,7 +287,7 @@ function TitleView({ title: t }: { title: Title }) {
 
           {t.media_type === "tv" && details?.seasons && details.seasons > 1 && (
             <Section title="Seasons">
-              <SeasonRatings titleId={t.id} count={details.seasons} />
+              <SeasonRatings titleId={t.id} count={details.seasons} onAverage={onSeasonsAverage} />
             </Section>
           )}
 

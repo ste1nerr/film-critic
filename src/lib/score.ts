@@ -8,6 +8,12 @@ export function overallOf(r: MaybeRatings): number | null {
   return Math.round((sum / CRITERIA.length) * 10) / 10;
 }
 
+/** The overall the database stores: the season average once a season is scored, else the criteria. */
+export function titleOverall(t: MaybeRatings & { seasons_overall: number | null }): number | null {
+  const own = overallOf(t);
+  return own == null ? null : (t.seasons_overall ?? own);
+}
+
 export function formatScore(n: number | null | undefined): string {
   return n == null ? "—" : n.toFixed(1);
 }

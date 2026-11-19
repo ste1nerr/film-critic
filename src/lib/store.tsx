@@ -2,7 +2,7 @@
 
 import type { RealtimePostgresChangesPayload, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { overallOf } from "./score";
+import { titleOverall } from "./score";
 import { supabase } from "./supabase";
 import { CRITERIA, type Title, type TitleInput } from "./types";
 
@@ -18,6 +18,8 @@ interface Store {
   addTitle(input: TitleInput): Promise<Title>;
   updateTitle(id: string, patch: Partial<TitleInput>): Promise<void>;
   removeTitle(id: string): Promise<void>;
+  /** Mirrors locally what the title_seasons trigger wrote to titles.seasons_overall. */
+  setSeasonsOverall(id: string, value: number | null): void;
   /** Bulk import: rows with `id` update that title, the rest are inserted. */
   importTitles(rows: (TitleInput & { id?: string })[]): Promise<void>;
 }
@@ -142,7 +144,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         list.map((t) => {
           if (t.id !== id) return t;
           const next = { ...t, ...patch };
-          return CRITERIA.some((c) => c.key in patch) ? { ...next, overall: overallOf(next) } : next;
+          return CRITERIA.some((c) => c.key in patch) ? { ...next, overall: titleOverall(next) } : next;
         }),
       );
       // RLS turns a forbidden update into "0 rows, no error"; select the row to notice that.
@@ -186,6 +188,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [reload],
   );
 
+  const setSeasonsOverall = useCallback((id: string, value: number | null) => {
+    setTitles((list) => list.map((t) => (t.id === id ? { ...t, seasons_overall: value, overall: titleOverall({ ...t, seasons_overall: value }) } : t)));
+  }, []);
+
   const value = useMemo<Store>(
     () => ({
       user,
@@ -200,8 +206,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       updateTitle,
       removeTitle,
       importTitles,
+      setSeasonsOverall,
     }),
-    [user, authReady, titles, loading, error, signIn, signUp, signOut, addTitle, updateTitle, removeTitle, importTitles],
+    [user, authReady, titles, loading, error, signIn, signUp, signOut, addTitle, updateTitle, removeTitle, importTitles, setSeasonsOverall],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

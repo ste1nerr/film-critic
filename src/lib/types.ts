@@ -39,6 +39,8 @@ export interface TitleMeta {
 export interface Title extends TitleMeta, MaybeRatings {
   id: string;
   user_id: string;
+  /** Average of the scored seasons (kept by a trigger on title_seasons); when set it is the overall. */
+  seasons_overall: number | null;
   overall: number | null;
   note: string | null;
   /** Place on the watchlist, lower first; null until the list is first reordered. */

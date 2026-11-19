@@ -17,11 +17,21 @@ function seasonScore(r: MaybeRatings): number | null {
  * Per-season "watched" marks, each scored on the same five criteria as the title. A row in
  * title_seasons = watched; any criterion may stay empty. Folded until opened or until a season is marked.
  */
-export function SeasonRatings({ titleId, count }: { titleId: string; count: number }) {
+export function SeasonRatings({
+  titleId,
+  count,
+  onAverage,
+}: {
+  titleId: string;
+  count: number;
+  /** The scored seasons' average (null when none is scored), the way the database trigger keeps it on the title. */
+  onAverage(avg: number | null): void;
+}) {
   // season → its criteria; a missing key = not watched.
   const [seasons, setSeasons] = useState<Record<number, MaybeRatings>>({});
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -31,7 +41,9 @@ export function SeasonRatings({ titleId, count }: { titleId: string; count: numb
       .select("season, plot, ending, acting, atmosphere, vibe")
       .eq("title_id", titleId)
       .then(({ data }) => {
-        if (!alive || !data?.length) return;
+        if (!alive) return;
+        setLoaded(true);
+        if (!data?.length) return;
         setSeasons(Object.fromEntries(data.map(({ season, ...r }) => [season, { ...NO_RATINGS, ...r }])));
         setOpen(true);
       });
@@ -78,7 +90,12 @@ export function SeasonRatings({ titleId, count }: { titleId: string; count: numb
 
   const watched = Object.keys(seasons).length;
   const scores = Object.values(seasons).map(seasonScore).filter((n): n is number => n != null);
-  const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+  const avg = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+
+  // Until the rows arrive the empty state would read as "no scored seasons" and wipe the title's value.
+  useEffect(() => {
+    if (loaded) onAverage(avg);
+  }, [loaded, avg, onAverage]);
 
   if (!open) {
     return (
